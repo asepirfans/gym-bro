@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Plus, X } from 'lucide-react'
 import { getExercises } from '@/app/actions/exercises'
 import { createRoutine, addExerciseToRoutine } from '@/app/actions/routines'
+import { useToast } from '@/components/toast-provider'
 
 interface DbExercise {
   id: number
@@ -26,10 +27,12 @@ interface RoutineExercise {
 
 export default function RoutineBuilder() {
   const router = useRouter()
+  const { warning, error: toastError, success } = useToast()
   const [dbExercises, setDbExercises] = useState<DbExercise[]>([])
   const [routineName, setRoutineName] = useState('')
   const [routineDescription, setRoutineDescription] = useState('')
   const [exercises, setExercises] = useState<RoutineExercise[]>([])
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -56,7 +59,7 @@ export default function RoutineBuilder() {
 
     // Prevent duplicate exercises in builder for simplicity
     if (exercises.some((e) => e.exerciseId === exercise.id)) {
-      alert('This exercise is already added to the routine')
+      warning('Sudah ditambahkan', 'Exercise ini sudah ada di rutinitas.')
       return
     }
 
@@ -83,7 +86,7 @@ export default function RoutineBuilder() {
 
   const handleSave = async () => {
     if (!routineName || exercises.length === 0) {
-      alert('Please enter a routine name and add at least one exercise')
+      warning('Rutinitas belum lengkap', 'Masukkan nama rutinitas dan tambahkan minimal satu exercise.')
       return
     }
 
@@ -112,7 +115,7 @@ export default function RoutineBuilder() {
       router.refresh()
     } catch (err) {
       console.error('Failed to create routine:', err)
-      alert('An error occurred while saving the routine. Please try again.')
+      toastError('Gagal menyimpan', 'Terjadi kesalahan saat menyimpan rutinitas.')
     } finally {
       setLoading(false)
     }
@@ -121,6 +124,11 @@ export default function RoutineBuilder() {
   if (fetching) {
     return <div className="text-center text-slate-400 py-12">Loading routine builder...</div>
   }
+
+  const filteredExercises = dbExercises.filter((ex) => {
+    if (!selectedCategory) return true
+    return ex.category.toLowerCase() === selectedCategory.toLowerCase()
+  })
 
   return (
     <div className="space-y-6">
@@ -159,23 +167,42 @@ export default function RoutineBuilder() {
           <CardDescription>Add exercises to your routine</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-3">
             <select
-              value={selectedExerciseId}
-              onChange={(e) => setSelectedExerciseId(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize"
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value)
+                setSelectedExerciseId('') // Reset selected exercise when category changes
+              }}
+              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize text-sm sm:w-48 focus:outline-none focus:border-orange-500"
             >
-              <option value="">Select an exercise...</option>
-              {dbExercises.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.name} ({ex.category})
-                </option>
-              ))}
+              <option value="">All Categories</option>
+              <option value="chest">Chest</option>
+              <option value="back">Back</option>
+              <option value="legs">Legs</option>
+              <option value="shoulders">Shoulders</option>
+              <option value="arms">Arms</option>
+              <option value="core">Core</option>
             </select>
-            <Button onClick={addExercise} className="gap-2 bg-orange-500 hover:bg-orange-600">
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
+
+            <div className="flex flex-1 gap-2">
+              <select
+                value={selectedExerciseId}
+                onChange={(e) => setSelectedExerciseId(e.target.value)}
+                className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize text-sm focus:outline-none focus:border-orange-500"
+              >
+                <option value="">Select an exercise...</option>
+                {filteredExercises.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name}
+                  </option>
+                ))}
+              </select>
+              <Button onClick={addExercise} className="gap-2 bg-orange-500 hover:bg-orange-600 shrink-0">
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
+            </div>
           </div>
 
           {exercises.length === 0 ? (

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Trash2, Play } from 'lucide-react'
 import { getUserRoutines, deleteRoutine } from '@/app/actions/routines'
+import { useToast } from '@/components/toast-provider'
 
 interface Routine {
   id: number
@@ -17,6 +18,7 @@ interface Routine {
 export default function RoutinesClient() {
   const [routines, setRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
+  const { confirm, success, error } = useToast()
 
   useEffect(() => {
     async function load() {
@@ -32,14 +34,22 @@ export default function RoutinesClient() {
     load()
   }, [])
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this routine?')) return
-    try {
-      await deleteRoutine(id)
-      setRoutines(routines.filter((r) => r.id !== id))
-    } catch (err) {
-      console.error('Failed to delete routine:', err)
-    }
+  const handleDelete = (id: number) => {
+    confirm({
+      title: 'Hapus Rutinitas?',
+      message: 'Rutinitas ini akan dihapus permanen dan tidak bisa dikembalikan.',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await deleteRoutine(id)
+          setRoutines(prev => prev.filter((r) => r.id !== id))
+          success('Rutinitas dihapus', 'Rutinitas berhasil dihapus.')
+        } catch (err) {
+          console.error('Failed to delete routine:', err)
+          error('Gagal menghapus', 'Terjadi kesalahan, coba lagi.')
+        }
+      }
+    })
   }
 
   if (loading) {

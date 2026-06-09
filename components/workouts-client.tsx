@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card'
 import { Trash2, Share2, Edit2, Check, X } from 'lucide-react'
 import { getUserWorkouts, deleteWorkout, updateWorkoutName } from '@/app/actions/workouts'
 import ShareWorkoutModal from '@/components/share-workout-modal'
+import ActiveWorkoutBanner from '@/components/active-workout-banner'
+import { useToast } from '@/components/toast-provider'
 
 interface Workout {
   id: number
@@ -24,6 +26,7 @@ export default function WorkoutsClient() {
   const [shareWorkoutId, setShareWorkoutId] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
+  const { confirm, success, error } = useToast()
 
   useEffect(() => {
     async function load() {
@@ -39,14 +42,22 @@ export default function WorkoutsClient() {
     load()
   }, [])
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this workout log?')) return
-    try {
-      await deleteWorkout(id)
-      setWorkouts(workouts.filter((w) => w.id !== id))
-    } catch (err) {
-      console.error('Failed to delete workout:', err)
-    }
+  const handleDelete = (id: number) => {
+    confirm({
+      title: 'Hapus Workout Log?',
+      message: 'Sesi latihan ini akan dihapus permanen dan tidak bisa dikembalikan.',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await deleteWorkout(id)
+          setWorkouts(prev => prev.filter((w) => w.id !== id))
+          success('Workout dihapus', 'Sesi latihan berhasil dihapus.')
+        } catch (err) {
+          console.error('Failed to delete workout:', err)
+          error('Gagal menghapus', 'Terjadi kesalahan, coba lagi.')
+        }
+      }
+    })
   }
 
   const handleSaveName = async (id: number) => {
@@ -55,8 +66,10 @@ export default function WorkoutsClient() {
       await updateWorkoutName(id, editValue.trim())
       setWorkouts(workouts.map((w) => w.id === id ? { ...w, name: editValue.trim() } : w))
       setEditingId(null)
+      success('Nama diperbarui', 'Nama workout berhasil disimpan.')
     } catch (err) {
       console.error('Failed to update workout name:', err)
+      error('Gagal menyimpan', 'Nama workout tidak bisa diperbarui.')
     }
   }
 
@@ -77,6 +90,7 @@ export default function WorkoutsClient() {
 
   return (
     <div className="space-y-4">
+      <ActiveWorkoutBanner />
       {workouts.length === 0 ? (
         <Card className="border-slate-800 bg-slate-900/50 p-8 text-center">
           <p className="mb-4 text-slate-400">No workouts logged yet</p>

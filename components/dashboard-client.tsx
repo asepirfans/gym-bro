@@ -7,6 +7,7 @@ import OverviewTab from '@/components/tabs/overview'
 import RoutinesTab from '@/components/tabs/routines'
 import ProgressTab from '@/components/tabs/progress'
 import { getDashboardStats } from '@/app/actions/dashboard'
+import ActiveWorkoutBanner from '@/components/active-workout-banner'
 
 export default function DashboardClient() {
   const [activeTab, setActiveTab] = useState('overview')
@@ -37,6 +38,7 @@ export default function DashboardClient() {
 
   return (
     <div className="space-y-8">
+      <ActiveWorkoutBanner />
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         <a href="/workouts" className="rounded-lg border border-slate-800 bg-slate-900/50 p-6 transition hover:border-orange-600 hover:bg-orange-950/10">

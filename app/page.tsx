@@ -37,9 +37,9 @@ export default async function DashboardPage() {
             <h1 className="text-2xl font-bold text-white">GymBro</h1>
           </div>
           <div className="flex items-center gap-6">
-            <div className="text-sm text-slate-400">
+            {/* <div className="text-sm text-slate-400">
               Welcome, <span className="font-semibold text-slate-200">{session.user.name || session.user.email}</span>
-            </div>
+            </div> */}
             <form
               action={async () => {
                 'use server'

@@ -180,7 +180,7 @@ export async function logWorkoutSet(data: {
 
     if (existingProgress.length) {
       const maxWeight = weight
-        ? Math.max(parseFloat(existingProgress[0].maxWeight || '0') || 0, weight)
+        ? Math.max(parseFloat(existingProgress[0].maxWeight || '0') || 0, weight).toString()
         : existingProgress[0].maxWeight
 
       await db
@@ -201,9 +201,9 @@ export async function logWorkoutSet(data: {
       await db.insert(progress).values({
         userId,
         exerciseId: data.exerciseId,
-        weight,
+        weight: data.weight,
         reps,
-        maxWeight: weight,
+        maxWeight: data.weight,
         recordedAt: new Date(),
       })
     }
@@ -297,4 +297,55 @@ export async function updateWorkoutName(id: number, name: string) {
   revalidatePath('/workouts')
   revalidatePath('/')
   return result[0]
+}
+
+// Get previous logged sets for a specific exercise
+export async function getPreviousWorkoutSets(exerciseId: number) {
+  const userId = await getUserId()
+
+  // 1. Find the most recent completed workout that has sets for this exercise
+  const recentWorkout = await db
+    .select({
+      id: workout.id,
+      completedAt: workout.completedAt,
+    })
+    .from(workout)
+    .innerJoin(workoutSet, eq(workoutSet.workoutId, workout.id))
+    .where(
+      and(
+        eq(workout.userId, userId),
+        eq(workoutSet.exerciseId, exerciseId),
+        gt(workout.completedAt, new Date(0)) // completed workouts
+      )
+    )
+    .orderBy(desc(workout.completedAt))
+    .limit(1)
+
+  if (recentWorkout.length === 0) {
+    return []
+  }
+
+  const workoutId = recentWorkout[0].id
+
+  // 2. Fetch all sets for this exercise from that specific workout
+  const sets = await db
+    .select({
+      setNumber: workoutSet.setNumber,
+      reps: workoutSet.reps,
+      weight: workoutSet.weight,
+    })
+    .from(workoutSet)
+    .where(
+      and(
+        eq(workoutSet.workoutId, workoutId),
+        eq(workoutSet.exerciseId, exerciseId)
+      )
+    )
+    .orderBy(workoutSet.setNumber)
+
+  return sets.map(s => ({
+    setNumber: s.setNumber,
+    reps: s.reps || undefined,
+    weight: s.weight ? s.weight.toString() : undefined
+  }))
 }

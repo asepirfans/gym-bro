@@ -11,6 +11,8 @@ const exercises = [
   { name: 'Push-ups', category: 'chest', description: 'Bodyweight chest press' },
   { name: 'Incline Barbell Bench Press', category: 'chest', description: 'Barbell chest press on an incline bench' },
   { name: 'Dumbbell Pullover', category: 'chest', description: 'Lying dumbbell pullover for upper chest and serratus' },
+  { name: 'Chest Press', category: 'chest', description: 'Machine chest press' },
+  { name: 'Chest Fly Machine', category: 'chest', description: 'Machine chest fly' },
 
   // Back (Pull)
   { name: 'Conventional Deadlift', category: 'back', description: 'Barbell deadlift from the floor' },

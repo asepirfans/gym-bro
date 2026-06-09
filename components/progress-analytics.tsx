@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Dumbbell } from 'lucide-react'
 import { getProgressStats } from '@/app/actions/dashboard'
+import MuscleHeatmap from '@/components/muscle-heatmap'
 
 interface ProgressData {
   personalRecords: { exercise: string; weight: number; date: string }[]
@@ -169,6 +170,29 @@ export default function ProgressAnalytics() {
         </TabsContent>
 
         <TabsContent value="muscles" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <MuscleHeatmap data={data.muscleGroupData} />
+
+            {radarData.length > 0 && (
+              <Card className="border-slate-800 bg-slate-900/50">
+                <CardHeader>
+                  <CardTitle>Training Balance</CardTitle>
+                  <CardDescription>Relative intensity by muscle group (0-100)</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height={310}>
+                    <RadarChart data={radarData}>
+                      <PolarGrid stroke="#333" />
+                      <PolarAngleAxis dataKey="name" stroke="#94a3b8" />
+                      <PolarRadiusAxis angle={90} domain={[0, 100]} stroke="#94a3b8" />
+                      <Radar name="Intensity" dataKey="value" stroke="#f97316" fill="#f97316" fillOpacity={0.4} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
           <Card className="border-slate-800 bg-slate-900/50">
             <CardHeader>
               <CardTitle>Muscle Group Volume</CardTitle>
@@ -189,25 +213,6 @@ export default function ProgressAnalytics() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-
-          {radarData.length > 0 && (
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle>Training Balance</CardTitle>
-                <CardDescription>Relative intensity by muscle group (0-100)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={350}>
-                  <RadarChart data={radarData}>
-                    <PolarGrid stroke="#333" />
-                    <PolarAngleAxis dataKey="name" stroke="#94a3b8" />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} stroke="#94a3b8" />
-                    <Radar name="Intensity" dataKey="value" stroke="#f97316" fill="#f97316" fillOpacity={0.4} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
       </Tabs>
     </div>

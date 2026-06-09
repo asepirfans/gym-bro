@@ -33,7 +33,7 @@ interface WorkoutDetail {
 }
 
 type ThemeKey = 'orange' | 'blue' | 'purple' | 'stealth' | 'transparent'
-type LayoutKey = 'radar' | 'list'
+type LayoutKey = 'radar' | 'list' | 'heatmap'
 
 const THEMES: Record<ThemeKey, { name: string; bgStart: string; bgEnd: string; primary: string; secondary: string; glow: string }> = {
   orange: {
@@ -78,6 +78,67 @@ const THEMES: Record<ThemeKey, { name: string; bgStart: string; bgEnd: string; p
   },
 }
 
+const HEATMAP_MUSCLE_GROUPS = [
+  {
+    name: 'Chest',
+    categoryKey: 'chest',
+    paths: [
+      { d: 'M 74,54 C 68,54 62,56 58,61 C 55,65 54,75 58,81 C 62,86 70,86 74,84 Z', isFront: true },
+      { d: 'M 76,54 C 82,54 88,56 92,61 C 95,65 96,75 92,81 C 88,86 80,86 76,84 Z', isFront: true },
+    ]
+  },
+  {
+    name: 'Back',
+    categoryKey: 'back',
+    paths: [
+      { d: 'M 226,54 C 221,62 217,75 214,92 C 219,95 228,96 234,95 C 234,80 232,65 228,54 Z', isFront: false },
+      { d: 'M 244,54 C 249,62 253,75 256,92 C 251,95 242,96 236,95 C 236,80 238,65 242,54 Z', isFront: false },
+      { d: 'M 221,96 C 219,105 220,125 224,142 C 228,143 242,143 246,142 C 250,125 251,105 249,96 C 241,98 229,98 221,96 Z', isFront: false },
+    ]
+  },
+  {
+    name: 'Legs',
+    categoryKey: 'legs',
+    paths: [
+      { d: 'M 52,143 C 50,165 52,195 58,220 C 62,221 68,220 73,212 C 73,195 72,165 67,143 Z', isFront: true },
+      { d: 'M 98,143 C 100,165 98,195 92,220 C 88,221 82,220 77,212 C 77,195 78,165 83,143 Z', isFront: true },
+      { d: 'M 58,222 C 55,235 55,260 61,288 C 63,289 65,289 66,288 C 68,260 67,235 62,222 Z', isFront: true },
+      { d: 'M 92,222 C 95,235 95,260 89,288 C 87,289 85,289 84,288 C 82,260 83,235 88,222 Z', isFront: true },
+      { d: 'M 212,143 C 210,165 212,195 218,220 C 222,221 228,220 233,212 C 233,195 232,165 227,143 Z', isFront: false },
+      { d: 'M 258,143 C 260,165 258,195 252,220 C 248,221 242,220 237,212 C 237,195 238,165 243,143 Z', isFront: false },
+      { d: 'M 218,222 C 215,235 215,260 221,288 C 223,289 225,289 226,288 C 228,260 227,235 222,222 Z', isFront: false },
+      { d: 'M 252,222 C 255,235 255,260 249,288 C 247,289 245,289 244,288 C 242,260 243,235 248,222 Z', isFront: false },
+    ]
+  },
+  {
+    name: 'Shoulders',
+    categoryKey: 'shoulders',
+    paths: [
+      { d: 'M 68,51 C 60,54 52,56 46,62 C 43,65 42,72 46,75 C 50,77 54,74 58,68 C 61,64 63,58 66,54 Z', isFront: true },
+      { d: 'M 82,51 C 90,54 98,56 104,62 C 107,65 108,72 104,75 C 100,77 96,74 92,68 C 89,64 87,58 84,54 Z', isFront: true },
+      { d: 'M 228,51 C 220,54 212,56 206,62 C 203,65 202,72 206,75 C 210,77 214,74 218,68 C 221,64 223,58 226,54 Z', isFront: false },
+      { d: 'M 242,51 C 250,54 258,56 264,62 C 267,65 268,72 264,75 C 260,77 256,74 252,68 C 249,64 247,58 244,54 Z', isFront: false },
+    ]
+  },
+  {
+    name: 'Arms',
+    categoryKey: 'arms',
+    paths: [
+      { d: 'M 45,74 C 40,82 37,98 38,115 C 39,122 43,124 46,122 C 48,112 49,95 53,83 Z', isFront: true },
+      { d: 'M 105,74 C 110,82 113,98 112,115 C 111,122 107,124 104,122 C 102,112 101,95 97,83 Z', isFront: true },
+      { d: 'M 205,74 C 200,82 197,98 198,115 C 199,122 203,124 206,122 C 208,112 209,95 213,83 Z', isFront: false },
+      { d: 'M 265,74 C 270,82 273,98 272,115 C 271,122 267,124 264,122 C 262,112 261,95 257,83 Z', isFront: false },
+    ]
+  },
+  {
+    name: 'Core',
+    categoryKey: 'core',
+    paths: [
+      { d: 'M 61,86 C 58,95 59,120 63,142 C 67,144 83,144 87,142 C 91,120 92,95 89,86 C 82,88 68,88 61,86 Z', isFront: true },
+    ]
+  }
+]
+
 export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareWorkoutModalProps) {
   const [loading, setLoading] = useState(false)
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null)
@@ -92,7 +153,7 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
     async function load() {
       setLoading(true)
       try {
-        const data = await getWorkout(workoutId)
+        const data = await getWorkout(workoutId!)
         
         // Mapped response structure
         const detail: WorkoutDetail = {
@@ -191,6 +252,32 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
   // 3. SVG rendering values
   const theme = THEMES[activeTheme]
 
+  const getIntensity = (categoryKey: string) => {
+    const vol = volumeByMuscle[categoryKey.toLowerCase()] || 0
+    return vol / maxMuscleVolume
+  }
+
+  const getHeatmapColor = (intensity: number) => {
+    if (intensity === 0) return '#1e293b'
+    
+    const hexToRgb = (hex: string) => {
+      const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i
+      const fullHex = hex.replace(shorthandRegex, (_, r, g, b) => r + r + g + g + b + b)
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex)
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 249, g: 115, b: 22 }
+    }
+
+    const rgb = hexToRgb(theme.primary)
+    const r = Math.round(30 + (rgb.r - 30) * intensity)
+    const g = Math.round(41 + (rgb.g - 41) * intensity)
+    const b = Math.round(59 + (rgb.b - 59) * intensity)
+    return `rgb(${r}, ${g}, ${b})`
+  }
+
   // Concentric Hexagon Calculations for Radar Chart
   const Cx = 400
   const Cy = 640
@@ -223,7 +310,7 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
     return `${x},${y}`
   }).join(' ')
 
-  const labels = [
+  const labels: { text: string; x: number; y: number; anchor: 'start' | 'middle' | 'end' }[] = [
     { text: 'Back', x: Cx, y: Cy - 180, anchor: 'middle' },
     { text: 'Legs', x: Cx + 180 * Math.cos(angles[1]), y: Cy + 180 * Math.sin(angles[1]) + 5, anchor: 'start' },
     { text: 'Chest', x: Cx + 180 * Math.cos(angles[2]), y: Cy + 180 * Math.sin(angles[2]) + 5, anchor: 'start' },
@@ -324,6 +411,9 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                       <stop offset="0%" stopColor={theme.primary} stopOpacity="0.55" />
                       <stop offset="100%" stopColor={theme.secondary} stopOpacity="0.25" />
                     </linearGradient>
+                    <pattern id="hud-grid" width="4" height="4" patternUnits="userSpaceOnUse">
+                      <path d="M 4 0 L 0 0 0 4" fill="none" stroke="#ffffff" strokeWidth="0.5" strokeOpacity="0.18" />
+                    </pattern>
                   </defs>
 
                   {/* Draw solid background only if not transparent */}
@@ -390,7 +480,91 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                   <line x1="60" y1="435" x2="740" y2="435" stroke="#334155" strokeWidth="2" strokeOpacity="0.5" />
 
                   {/* Layout Contents */}
-                  {activeLayout === 'radar' ? (
+                  {activeLayout === 'heatmap' ? (
+                    <g>
+                      {/* Grid background for cybernetic HUD effect */}
+                      <g stroke={theme.primary} strokeWidth="0.5" strokeOpacity="0.12">
+                        {/* Vertical grid lines */}
+                        <line x1="100" y1="460" x2="100" y2="880" />
+                        <line x1="200" y1="460" x2="200" y2="880" />
+                        <line x1="300" y1="460" x2="300" y2="880" />
+                        <line x1="400" y1="460" x2="400" y2="880" strokeOpacity="0.25" strokeWidth="1" />
+                        <line x1="500" y1="460" x2="500" y2="880" />
+                        <line x1="600" y1="460" x2="600" y2="880" />
+                        <line x1="700" y1="460" x2="700" y2="880" />
+                        {/* Horizontal grid lines */}
+                        <line x1="60" y1="500" x2="740" y2="500" />
+                        <line x1="60" y1="580" x2="740" y2="580" />
+                        <line x1="60" y1="660" x2="740" y2="660" />
+                        <line x1="60" y1="740" x2="740" y2="740" />
+                        <line x1="60" y1="820" x2="740" y2="820" />
+                      </g>
+
+                      {/* FRONT VIEW */}
+                      <g transform="translate(135, 480) scale(1.4)">
+                        <circle cx="75" cy="30" r="12" fill={`${theme.primary}22`} stroke={theme.primary} strokeWidth="1" strokeOpacity="0.5" />
+                        <path d="M 71,41 C 71,46 72,50 69,53 L 81,53 C 78,50 79,46 79,41 Z" fill={`${theme.primary}11`} stroke={theme.primary} strokeWidth="0.8" strokeOpacity="0.4" />
+                        
+                        {HEATMAP_MUSCLE_GROUPS.map((group) => {
+                          const intensity = getIntensity(group.categoryKey)
+                          const color = getHeatmapColor(intensity)
+                          
+                          return group.paths
+                            .filter((p) => p.isFront)
+                            .map((path, idx) => (
+                              <g key={`${group.name}-front-${idx}`}>
+                                <path
+                                  d={path.d}
+                                  fill={color}
+                                  stroke={intensity > 0 ? theme.primary : '#334155'}
+                                  strokeWidth="1.2"
+                                />
+                                <path
+                                  d={path.d}
+                                  fill="url(#hud-grid)"
+                                  style={{ mixBlendMode: 'overlay' }}
+                                />
+                              </g>
+                            ))
+                        })}
+                        <text x="75" y="300" fill="#64748b" fontSize="11" fontWeight="800" textAnchor="middle" letterSpacing="1">
+                          FRONT
+                        </text>
+                      </g>
+
+                      {/* BACK VIEW */}
+                      <g transform="translate(231, 480) scale(1.4)">
+                        <circle cx="235" cy="30" r="12" fill={`${theme.primary}22`} stroke={theme.primary} strokeWidth="1" strokeOpacity="0.5" />
+                        <path d="M 231,41 C 231,46 232,50 229,53 L 241,53 C 238,50 239,46 239,41 Z" fill={`${theme.primary}11`} stroke={theme.primary} strokeWidth="0.8" strokeOpacity="0.4" />
+                        
+                        {HEATMAP_MUSCLE_GROUPS.map((group) => {
+                          const intensity = getIntensity(group.categoryKey)
+                          const color = getHeatmapColor(intensity)
+                          
+                          return group.paths
+                            .filter((p) => !p.isFront)
+                            .map((path, idx) => (
+                              <g key={`${group.name}-back-${idx}`}>
+                                <path
+                                  d={path.d}
+                                  fill={color}
+                                  stroke={intensity > 0 ? theme.primary : '#334155'}
+                                  strokeWidth="1.2"
+                                />
+                                <path
+                                  d={path.d}
+                                  fill="url(#hud-grid)"
+                                  style={{ mixBlendMode: 'overlay' }}
+                                />
+                              </g>
+                            ))
+                        })}
+                        <text x="235" y="300" fill="#64748b" fontSize="11" fontWeight="800" textAnchor="middle" letterSpacing="1">
+                          BACK
+                        </text>
+                      </g>
+                    </g>
+                  ) : activeLayout === 'radar' ? (
                     <g>
                       {/* Hexagonal Grids */}
                       <polygon points={getHexPoints(50)} fill="none" stroke="#1e293b" strokeWidth="1.5" />
@@ -542,26 +716,36 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                   <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
                     <Sliders className="h-4 w-4 text-orange-500" /> Card Layout
                   </label>
-                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
                     <button
                       onClick={() => setActiveLayout('list')}
-                      className={`py-2 text-sm font-semibold rounded-md transition ${
+                      className={`py-2 text-xs font-semibold rounded-md transition ${
                         activeLayout === 'list'
                           ? 'bg-orange-500 text-white shadow'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Exercise List
+                      List
                     </button>
                     <button
                       onClick={() => setActiveLayout('radar')}
-                      className={`py-2 text-sm font-semibold rounded-md transition ${
+                      className={`py-2 text-xs font-semibold rounded-md transition ${
                         activeLayout === 'radar'
                           ? 'bg-orange-500 text-white shadow'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Muscle Balance
+                      Balance
+                    </button>
+                    <button
+                      onClick={() => setActiveLayout('heatmap')}
+                      className={`py-2 text-xs font-semibold rounded-md transition ${
+                        activeLayout === 'heatmap'
+                          ? 'bg-orange-500 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Heatmap
                     </button>
                   </div>
                 </div>
