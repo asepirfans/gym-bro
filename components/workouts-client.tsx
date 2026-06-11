@@ -20,7 +20,7 @@ interface Workout {
   notes: string | null
 }
 
-export default function WorkoutsClient() {
+export default function WorkoutsClient({ userId }: { userId: string }) {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [loading, setLoading] = useState(true)
   const [shareWorkoutId, setShareWorkoutId] = useState<number | null>(null)
@@ -90,7 +90,7 @@ export default function WorkoutsClient() {
 
   return (
     <div className="space-y-4">
-      <ActiveWorkoutBanner />
+      <ActiveWorkoutBanner userId={userId} />
       {workouts.length === 0 ? (
         <Card className="border-slate-800 bg-slate-900/50 p-8 text-center">
           <p className="mb-4 text-slate-400">No workouts logged yet</p>
@@ -148,7 +148,13 @@ export default function WorkoutsClient() {
                   )}
                   <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-400">
                     <span>{formatDate(workout.startedAt)}</span>
-                    {workout.duration && <span>{workout.duration} min</span>}
+                     {workout.duration && (
+                       <span>
+                         {workout.duration < 60
+                           ? `${workout.duration} min`
+                           : `${Math.floor(workout.duration / 60)} jam${workout.duration % 60 > 0 ? ` ${workout.duration % 60} min` : ''}`}
+                       </span>
+                     )}
                     {workout.notes && <span className="text-slate-300 italic">"{workout.notes}"</span>}
                   </div>
                 </div>

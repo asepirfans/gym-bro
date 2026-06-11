@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ToastProvider } from '@/components/toast-provider'
+import BottomNavigation from '@/components/bottom-navigation'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({
@@ -31,12 +32,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark bg-slate-950`}>
-      <body className="font-sans antialiased bg-slate-950 text-slate-50">
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+      <body className="font-sans antialiased bg-slate-950 text-slate-50 min-h-screen">
+        <div className="w-full min-h-screen bg-slate-950 flex flex-col relative pb-20 md:pb-0">
+          <ToastProvider>
+            {children}
+            <BottomNavigation />
+          </ToastProvider>
+        </div>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )
 }
+

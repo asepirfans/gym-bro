@@ -1,16 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dumbbell, Calendar, TrendingUp } from 'lucide-react'
 import OverviewTab from '@/components/tabs/overview'
-import RoutinesTab from '@/components/tabs/routines'
-import ProgressTab from '@/components/tabs/progress'
 import { getDashboardStats } from '@/app/actions/dashboard'
 import ActiveWorkoutBanner from '@/components/active-workout-banner'
 
-export default function DashboardClient() {
-  const [activeTab, setActiveTab] = useState('overview')
+export default function DashboardClient({ userId }: { userId: string }) {
   const [stats, setStats] = useState({
     workoutsCount: 0,
     routinesCount: 0,
@@ -38,7 +34,7 @@ export default function DashboardClient() {
 
   return (
     <div className="space-y-8">
-      <ActiveWorkoutBanner />
+      <ActiveWorkoutBanner userId={userId} />
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         <a href="/workouts" className="rounded-lg border border-slate-800 bg-slate-900/50 p-6 transition hover:border-orange-600 hover:bg-orange-950/10">
@@ -78,26 +74,10 @@ export default function DashboardClient() {
         </a>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-slate-800">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="routines">Routines</TabsTrigger>
-          <TabsTrigger value="progress">Progress</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <OverviewTab />
-        </TabsContent>
-
-        <TabsContent value="routines" className="space-y-4">
-          <RoutinesTab />
-        </TabsContent>
-
-        <TabsContent value="progress" className="space-y-4">
-          <ProgressTab />
-        </TabsContent>
-      </Tabs>
+      <div className="space-y-4">
+        <OverviewTab userId={userId} />
+      </div>
     </div>
   )
 }
+

@@ -33,7 +33,7 @@ interface WorkoutDetail {
 }
 
 type ThemeKey = 'orange' | 'blue' | 'purple' | 'stealth' | 'transparent'
-type LayoutKey = 'radar' | 'list' | 'heatmap'
+type LayoutKey = 'radar' | 'list' | 'heatmap' | 'combined'
 
 const THEMES: Record<ThemeKey, { name: string; bgStart: string; bgEnd: string; primary: string; secondary: string; glow: string }> = {
   orange: {
@@ -249,6 +249,16 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
     })
   }
 
+  const formatDuration = (mins: number | null) => {
+    const minutes = mins || 0
+    if (minutes < 60) return `${minutes} min`
+    const hours = Math.floor(minutes / 60)
+    const rem = minutes % 60
+    return rem > 0 ? `${hours} jam ${rem} min` : `${hours} jam`
+  }
+
+  const formattedDuration = formatDuration(workout?.duration || 0)
+
   // 3. SVG rendering values
   const theme = THEMES[activeTheme]
 
@@ -318,6 +328,25 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
     { text: 'Core', x: Cx + 180 * Math.cos(angles[4]), y: Cy + 180 * Math.sin(angles[4]) + 5, anchor: 'end' },
     { text: 'Shoulders', x: Cx + 180 * Math.cos(angles[5]), y: Cy + 180 * Math.sin(angles[5]) + 5, anchor: 'end' },
   ]
+
+  const getHexPointsComb = (radius: number, cx: number, cy: number) => {
+    return angles.map((a) => {
+      const x = cx + radius * Math.cos(a)
+      const y = cy + radius * Math.sin(a)
+      return `${x},${y}`
+    }).join(' ')
+  }
+
+  const getDataPointsComb = (cx: number, cy: number, r_min: number, r_max: number) => {
+    return angles.map((a, idx) => {
+      const cat = categoriesOrdered[idx]
+      const vol = volumeByMuscle[cat]
+      const r = r_min + (r_max - r_min) * (vol / maxMuscleVolume)
+      const x = cx + r * Math.cos(a)
+      const y = cy + r * Math.sin(a)
+      return `${x},${y}`
+    }).join(' ')
+  }
 
   // 4. Download Trigger
   const handleDownload = () => {
@@ -457,8 +486,8 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                   <g transform="translate(60, 315)">
                     {/* Duration */}
                     <g transform="translate(100, 0)">
-                      <text x="0" y="40" fill="#ffffff" fontSize="44" fontWeight="800" textAnchor="middle">
-                        {workout.duration || 0} min
+                      <text x="0" y="40" fill="#ffffff" fontSize={formattedDuration.length > 7 ? "34" : "44"} fontWeight="800" textAnchor="middle">
+                        {formattedDuration}
                       </text>
                       <text x="0" y="75" fill="#64748b" fontSize="18" fontWeight="700" letterSpacing="1.5" textAnchor="middle">
                         DURATION
@@ -604,6 +633,107 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                         </text>
                       ))}
                     </g>
+                  ) : activeLayout === 'combined' ? (
+                    <g>
+                      {/* Left Side: Smaller Radar Chart */}
+                      <g>
+                        {/* Concentric Hexagons */}
+                        <polygon points={getHexPointsComb(35, 230, 670)} fill="none" stroke="#1e293b" strokeWidth="1" />
+                        <polygon points={getHexPointsComb(70, 230, 670)} fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="3,3" />
+                        <polygon points={getHexPointsComb(105, 230, 670)} fill="none" stroke="#475569" strokeWidth="1.5" />
+
+                        {/* Radial Lines */}
+                        {angles.map((a, idx) => (
+                          <line
+                            key={idx}
+                            x1={230}
+                            y1={670}
+                            x2={230 + 105 * Math.cos(a)}
+                            y2={670 + 105 * Math.sin(a)}
+                            stroke="#334155"
+                            strokeWidth="1"
+                          />
+                        ))}
+
+                        {/* Data Polygon */}
+                        <polygon points={getDataPointsComb(230, 670, 15, 105)} fill="url(#polyGrad)" stroke={theme.primary} strokeWidth="2.5" />
+
+                        {/* Labels for Combined Radar */}
+                        {[
+                          { text: 'Back', x: 230, y: 670 - 125, anchor: 'middle' as const },
+                          { text: 'Legs', x: 230 + 125 * Math.cos(angles[1]), y: 670 + 125 * Math.sin(angles[1]) + 4, anchor: 'start' as const },
+                          { text: 'Chest', x: 230 + 125 * Math.cos(angles[2]), y: 670 + 125 * Math.sin(angles[2]) + 4, anchor: 'start' as const },
+                          { text: 'Arms', x: 230, y: 670 + 135, anchor: 'middle' as const },
+                          { text: 'Core', x: 230 + 125 * Math.cos(angles[4]), y: 670 + 125 * Math.sin(angles[4]) + 4, anchor: 'end' as const },
+                          { text: 'Shoulders', x: 230 + 125 * Math.cos(angles[5]), y: 670 + 125 * Math.sin(angles[5]) + 4, anchor: 'end' as const },
+                        ].map((label, idx) => (
+                          <text
+                            key={idx}
+                            x={label.x}
+                            y={label.y}
+                            fill="#f8fafc"
+                            fontSize="15"
+                            fontWeight="700"
+                            textAnchor={label.anchor}
+                            alignmentBaseline="middle"
+                            letterSpacing="0.3"
+                          >
+                            {label.text}
+                          </text>
+                        ))}
+                      </g>
+
+                      {/* Vertical separator line between radar and list */}
+                      <line x1="400" y1="465" x2="400" y2="875" stroke="#1e293b" strokeWidth="1.5" />
+
+                      {/* Right Side: List of exercises (up to 5 items) */}
+                      <g>
+                        {exercisesList.slice(0, 5).map((ex, index) => {
+                          const yStart = 485 + index * 80
+                          const setSummary = ex.sets.map(s => `${s.reps || 0}r ${s.weight ? `@${parseFloat(s.weight)}kg` : ''}`).join(', ')
+                          return (
+                            <g key={index}>
+                              {/* Sets count bullet */}
+                              <rect x="425" y={yStart} width="50" height="36" rx="6" fill={`${theme.primary}20`} />
+                              <text
+                                x="450"
+                                y={yStart + 24}
+                                fill={theme.primary}
+                                fontSize="18"
+                                fontWeight="800"
+                                textAnchor="middle"
+                              >
+                                {ex.sets.length}x
+                              </text>
+
+                              {/* Exercise Name */}
+                              <text x="490" y={yStart + 18} fill="#ffffff" fontSize="18" fontWeight="700">
+                                {ex.name.length > 20 ? ex.name.slice(0, 18) + '...' : ex.name}
+                              </text>
+                              
+                              {/* Sets reps details */}
+                              <text x="490" y={yStart + 42} fill="#94a3b8" fontSize="14" fontWeight="500">
+                                {setSummary.length > 24 ? setSummary.slice(0, 22) + '...' : setSummary}
+                              </text>
+
+                              {/* Divider line except last element */}
+                              {index < 4 && index < exercisesList.length - 1 && (
+                                <line x1="425" y1={yStart + 63} x2="740" y2={yStart + 63} stroke="#1e293b" strokeWidth="1" />
+                              )}
+                            </g>
+                          )
+                        })}
+
+                        {/* +X more indicator */}
+                        {exercisesList.length > 5 && (
+                          <g transform="translate(425, 875)">
+                            <text x="0" y="0" fill={theme.primary} fontSize="15" fontWeight="700">
+                              + {exercisesList.length - 5} more exercises logged
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    </g>
                   ) : (
                     <g>
                       {/* Left Column (items 0 to 4) */}
@@ -716,7 +846,7 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                   <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
                     <Sliders className="h-4 w-4 text-orange-500" /> Card Layout
                   </label>
-                  <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
                     <button
                       onClick={() => setActiveLayout('list')}
                       className={`py-2 text-xs font-semibold rounded-md transition ${
@@ -746,6 +876,16 @@ export default function ShareWorkoutModal({ workoutId, isOpen, onClose }: ShareW
                       }`}
                     >
                       Heatmap
+                    </button>
+                    <button
+                      onClick={() => setActiveLayout('combined')}
+                      className={`py-2 text-xs font-semibold rounded-md transition ${
+                        activeLayout === 'combined'
+                          ? 'bg-orange-500 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Combined
                     </button>
                   </div>
                 </div>

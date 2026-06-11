@@ -7,14 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Play, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/toast-provider'
 
-export default function ActiveWorkoutBanner() {
+export default function ActiveWorkoutBanner({ userId }: { userId?: string }) {
   const router = useRouter()
   const [activeWorkout, setActiveWorkout] = useState<any>(null)
   const { confirm, success } = useToast()
 
+  const storageKey = userId ? `gymbro_active_workout_${userId}` : 'gymbro_active_workout'
+
   useEffect(() => {
     const checkActive = () => {
-      const saved = localStorage.getItem('gymbro_active_workout')
+      const saved = localStorage.getItem(storageKey)
       if (saved) {
         try {
           const parsed = JSON.parse(saved)
@@ -37,7 +39,7 @@ export default function ActiveWorkoutBanner() {
       window.removeEventListener('storage', checkActive)
       clearInterval(interval)
     }
-  }, [])
+  }, [storageKey])
 
   if (!activeWorkout) return null
 
@@ -47,7 +49,7 @@ export default function ActiveWorkoutBanner() {
       message: 'Sesi workout yang sedang berjalan akan dihapus permanen. Semua progres latihan aktif saat ini akan hilang.',
       danger: true,
       onConfirm: () => {
-        localStorage.removeItem('gymbro_active_workout')
+        localStorage.removeItem(storageKey)
         setActiveWorkout(null)
         success('Sesi dihapus', 'Sesi workout aktif telah dihapus.')
         router.refresh()

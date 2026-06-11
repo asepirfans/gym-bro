@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Zap, BookOpen, TrendingUp, Share2, Sparkles, CheckCircle2, AlertTriangle, Info, ChevronRight, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { getDashboardStats, getAIWorkoutInsights } from '@/app/actions/dashboard'
 import ShareWorkoutModal from '@/components/share-workout-modal'
+import FitnessAvatar from '@/components/fitness-avatar'
 
 interface RecentWorkout {
   id: number
@@ -31,23 +32,33 @@ interface AIInsightsData {
   }
 }
 
-export default function OverviewTab() {
+
+export default function OverviewTab({ userId }: { userId?: string }) {
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([])
   const [loading, setLoading] = useState(true)
   const [shareWorkoutId, setShareWorkoutId] = useState<number | null>(null)
   const [aiInsights, setAiInsights] = useState<AIInsightsData | null>(null)
   const [loadingInsights, setLoadingInsights] = useState(true)
-  const [insightsHidden, setInsightsHidden] = useState(() => {
+  const [insightsHidden, setInsightsHidden] = useState(false)
+  const [streak, setStreak] = useState<{
+    currentStreak: number
+    bestStreak: number
+    activeStreak: boolean
+    workedOutThisWeek: boolean
+  } | null>(null)
+
+  const storageKey = userId ? `gymbro_insights_hidden_${userId}` : 'gymbro_insights_hidden'
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('gymbro_insights_hidden') === 'true'
+      setInsightsHidden(localStorage.getItem(storageKey) === 'true')
     }
-    return false
-  })
+  }, [storageKey])
 
   const toggleInsights = () => {
     setInsightsHidden(prev => {
       const next = !prev
-      localStorage.setItem('gymbro_insights_hidden', String(next))
+      localStorage.setItem(storageKey, String(next))
       return next
     })
   }
@@ -61,6 +72,7 @@ export default function OverviewTab() {
         ])
         setRecentWorkouts(data.recentWorkouts)
         setAiInsights(insights as AIInsightsData)
+        setStreak(data.streak)
       } catch (err) {
         console.error('Failed to load overview data:', err)
       } finally {
@@ -104,6 +116,22 @@ export default function OverviewTab() {
 
   return (
     <div className="space-y-6">
+      {loading ? (
+        <Card className="border-slate-800 bg-slate-900/50 p-6 animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-slate-800 p-3 w-12 h-12" />
+            <div className="space-y-2 flex-1">
+              <div className="h-4 bg-slate-800 rounded w-1/3" />
+              <div className="h-3 bg-slate-800 rounded w-1/2" />
+            </div>
+          </div>
+        </Card>
+      ) : (
+        streak && (
+          <FitnessAvatar currentStreak={streak.currentStreak} />
+        )
+      )}
+
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2">
         <Link href="/workouts/start">
@@ -290,7 +318,11 @@ export default function OverviewTab() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-sm text-slate-300">{workout.duration} min</p>
+                      <p className="text-sm text-slate-300">
+                        {workout.duration < 60
+                          ? `${workout.duration} min`
+                          : `${Math.floor(workout.duration / 60)} jam${workout.duration % 60 > 0 ? ` ${workout.duration % 60} min` : ''}`}
+                      </p>
                       <p className="text-xs text-slate-500">{workout.exercises} sets</p>
                     </div>
                     <Button

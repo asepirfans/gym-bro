@@ -30,7 +30,7 @@ export default async function StartWorkoutPage() {
       {/* Content */}
       <div className="mx-auto max-w-4xl px-6 py-8">
         <Suspense fallback={<div className="text-center text-slate-400 py-12">Loading workout logger...</div>}>
-          <WorkoutLogger />
+          <WorkoutLogger userId={session.user.id} />
         </Suspense>
       </div>
     </main>

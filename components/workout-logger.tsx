@@ -32,7 +32,8 @@ interface DbExercise {
   category: string
 }
 
-export default function WorkoutLogger() {
+export default function WorkoutLogger({ userId }: { userId?: string }) {
+  const storageKey = userId ? `gymbro_active_workout_${userId}` : 'gymbro_active_workout'
   const router = useRouter()
   const searchParams = useSearchParams()
   const routineIdStr = searchParams.get('routineId')
@@ -199,7 +200,7 @@ export default function WorkoutLogger() {
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem('gymbro_active_workout')
+    const saved = localStorage.getItem(storageKey)
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -214,7 +215,7 @@ export default function WorkoutLogger() {
       }
     }
     loadTemplate()
-  }, [routineId])
+  }, [routineId, storageKey])
 
   const handleResumeWorkout = async () => {
     if (!savedWorkoutData) return
@@ -242,7 +243,7 @@ export default function WorkoutLogger() {
   }
 
   const handleDiscardSavedWorkout = () => {
-    localStorage.removeItem('gymbro_active_workout')
+    localStorage.removeItem(storageKey)
     setResumePromptVisible(false)
     loadTemplate()
   }
@@ -251,7 +252,7 @@ export default function WorkoutLogger() {
   useEffect(() => {
     if (workoutStarted && exercises.length > 0 && !workoutCompleted) {
       localStorage.setItem(
-        'gymbro_active_workout',
+        storageKey,
         JSON.stringify({
           routineId,
           exercises,
@@ -262,7 +263,7 @@ export default function WorkoutLogger() {
         })
       )
     }
-  }, [exercises, notes, actualStartTime, elapsedSeconds, workoutStarted, routineId, workoutCompleted])
+  }, [exercises, notes, actualStartTime, elapsedSeconds, workoutStarted, routineId, workoutCompleted, storageKey])
 
   const addExerciseToLog = async () => {
     if (!selectedAddExerciseId) return
@@ -306,6 +307,25 @@ export default function WorkoutLogger() {
       setCurrentExerciseId(newEx.id)
     }
     setSelectedAddExerciseId('')
+  }
+
+  const removeExercise = (exerciseId: number) => {
+    const exercise = exercises.find((e) => e.id === exerciseId)
+    if (!exercise) return
+
+    confirm({
+      title: 'Hapus Latihan?',
+      message: `Apakah Anda yakin ingin menghapus "${exercise.name}" beserta seluruh setnya dari sesi latihan ini?`,
+      danger: true,
+      onConfirm: () => {
+        const updated = exercises.filter((e) => e.id !== exerciseId)
+        setExercises(updated)
+        if (currentExerciseId === exerciseId) {
+          setCurrentExerciseId(updated.length > 0 ? updated[0].id : null)
+        }
+        success('Latihan dihapus', `"${exercise.name}" berhasil dihapus dari sesi.`)
+      }
+    })
   }
 
   const addSet = async (exerciseId: number) => {
@@ -450,7 +470,7 @@ export default function WorkoutLogger() {
 
       // Mark as completed FIRST to prevent autosave from re-writing localStorage
       setWorkoutCompleted(true)
-      localStorage.removeItem('gymbro_active_workout')
+      localStorage.removeItem(storageKey)
 
       router.push('/workouts')
       router.refresh()
@@ -643,14 +663,25 @@ export default function WorkoutLogger() {
                 <div className="flex-1">
                   <CardTitle className="text-white">{exercise.name}</CardTitle>
                 </div>
-                <Button
-                  onClick={() => setCurrentExerciseId(exercise.id)}
-                  variant={exercise.id === currentExerciseId ? 'default' : 'outline'}
-                  size="sm"
-                  className={exercise.id === currentExerciseId ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-700'}
-                >
-                  Focus
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    onClick={() => removeExercise(exercise.id)}
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-red-400 hover:bg-slate-800 h-9 w-9 rounded-lg"
+                    title="Hapus Latihan"
+                  >
+                    <X className="h-4 w-4" strokeWidth={2.5} />
+                  </Button>
+                  <Button
+                    onClick={() => setCurrentExerciseId(exercise.id)}
+                    variant={exercise.id === currentExerciseId ? 'default' : 'outline'}
+                    size="sm"
+                    className={exercise.id === currentExerciseId ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-700'}
+                  >
+                    Focus
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -752,7 +783,7 @@ export default function WorkoutLogger() {
                   danger: true,
                   onConfirm: () => {
                     setWorkoutCompleted(true)
-                    localStorage.removeItem('gymbro_active_workout')
+                    localStorage.removeItem(storageKey)
                     router.push('/workouts')
                     router.refresh()
                   }

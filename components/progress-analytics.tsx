@@ -6,12 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Dumbbell } from 'lucide-react'
-import { getProgressStats } from '@/app/actions/dashboard'
+import { Dumbbell, Trash2 } from 'lucide-react'
+import { getProgressStats, deleteProgressRecord } from '@/app/actions/dashboard'
 import MuscleHeatmap from '@/components/muscle-heatmap'
+import { useToast } from '@/components/toast-provider'
 
 interface ProgressData {
-  personalRecords: { exercise: string; weight: number; date: string }[]
+  personalRecords: { id: number; exercise: string; weight: number; maxWeight: number; date: string }[]
   volumeData: { date: string; volume: number }[]
   monthlyProgress: { month: string; workouts: number; totalVolume: number; avgDuration: number }[]
   muscleGroupData: { muscle: string; volume: number; reps: number }[]
@@ -20,6 +21,31 @@ interface ProgressData {
 export default function ProgressAnalytics() {
   const [data, setData] = useState<ProgressData | null>(null)
   const [loading, setLoading] = useState(true)
+  const { confirm, success, error } = useToast()
+
+  const handleDeletePR = (id: number, exerciseName: string) => {
+    confirm({
+      title: 'Hapus Personal Record?',
+      message: `Personal Record untuk "${exerciseName}" akan dihapus secara permanen dari statistik kemajuan Anda.`,
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await deleteProgressRecord(id)
+          setData(prev => {
+            if (!prev) return null
+            return {
+              ...prev,
+              personalRecords: prev.personalRecords.filter(pr => pr.id !== id)
+            }
+          })
+          success('PR Dihapus', `Personal Record untuk "${exerciseName}" berhasil dihapus.`)
+        } catch (err) {
+          console.error(err)
+          error('Gagal Menghapus', 'Terjadi kesalahan saat menghapus Personal Record.')
+        }
+      }
+    })
+  }
 
   useEffect(() => {
     async function load() {
@@ -71,7 +97,13 @@ export default function ProgressAnalytics() {
   const stats = [
     { label: 'Total Workouts', value: totalWorkouts.toString(), change: 'All time' },
     { label: 'Total Volume', value: `${totalVolume.toLocaleString()} kg`, change: 'All time' },
-    { label: 'Avg Workout', value: `${avgDuration} min`, change: 'Average session duration' },
+    {
+      label: 'Avg Workout',
+      value: avgDuration < 60
+        ? `${avgDuration} min`
+        : `${Math.floor(avgDuration / 60)} jam${avgDuration % 60 > 0 ? ` ${avgDuration % 60} min` : ''}`,
+      change: 'Average session duration'
+    },
     { label: 'Personal Records', value: data.personalRecords.length.toString(), change: 'Unique exercises' },
   ]
 
@@ -106,13 +138,63 @@ export default function ProgressAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
-              {data.personalRecords.map((pr) => (
-                <div key={pr.exercise} className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <p className="text-sm text-slate-400 font-semibold">{pr.exercise}</p>
-                  <p className="mt-1 text-3xl font-bold text-orange-400">{pr.weight} kg</p>
-                  <p className="mt-1 text-xs text-slate-500">{new Date(pr.date).toLocaleDateString()}</p>
-                </div>
-              ))}
+              {data.personalRecords.map((pr) => {
+                const diff = pr.weight - pr.maxWeight
+                const isDown = diff < 0
+
+                return (
+                  <div key={pr.exercise} className="relative rounded-lg border border-slate-700 bg-slate-800/50 p-4 flex flex-col justify-between group">
+                    <div>
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="text-sm text-slate-400 font-semibold">{pr.exercise}</p>
+                        
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeletePR(pr.id, pr.exercise)}
+                          className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-slate-700/50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      <div className="mt-2 flex items-baseline gap-3">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Terbaru</span>
+                          <span className="text-2xl font-bold text-white">{pr.weight} kg</span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-700 self-end mb-1" />
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Tertinggi (PR)</span>
+                          <span className="text-2xl font-bold text-orange-500">{pr.maxWeight} kg</span>
+                        </div>
+                      </div>
+
+                      {pr.maxWeight > 0 && (
+                        <div className="mt-3 flex items-center gap-1.5 text-[11px]">
+                          {pr.weight === pr.maxWeight ? (
+                            <span className="text-emerald-400 bg-emerald-950/20 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-900/30">
+                              🏆 Beban Tertinggi Aktif
+                            </span>
+                          ) : isDown ? (
+                            <span className="text-red-400 bg-red-950/20 px-2.5 py-0.5 rounded-full font-semibold border border-red-900/30">
+                              📉 Turun {Math.abs(diff)} kg dari PR
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 bg-slate-950/20 px-2.5 py-0.5 rounded-full font-semibold border border-slate-800">
+                              Beban stabil
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <p className="mt-3 text-[10px] text-slate-500 font-medium">
+                      Dicatat: {new Date(pr.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>

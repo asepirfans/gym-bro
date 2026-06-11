@@ -55,11 +55,86 @@ export async function getDashboardStats() {
       exercises: parseInt(w.exerciseCount) || 0
     }))
 
+    // 5. Calculate Weekly Streak
+    const allWorkoutsResult = await pool.query(
+      `SELECT "startedat" FROM "workout"
+       WHERE "userid" = $1 AND "completedat" IS NOT NULL
+       ORDER BY "startedat" DESC`,
+      [userId]
+    )
+
+    const workoutDates = allWorkoutsResult.rows.map(row => new Date(row.startedat))
+
+    // Unique week starts (in ms timestamp)
+    const uniqueWeeks = Array.from(new Set(workoutDates.map(d => {
+      const wStart = new Date(d)
+      const day = wStart.getDay()
+      const diff = wStart.getDate() - day + (day === 0 ? -6 : 1)
+      wStart.setDate(diff)
+      wStart.setHours(0, 0, 0, 0)
+      return wStart.getTime()
+    }))).sort((a, b) => b - a)
+
+    // Current week start (Monday 00:00:00)
+    const now = new Date()
+    const currentDay = now.getDay()
+    const currentDiff = now.getDate() - currentDay + (currentDay === 0 ? -6 : 1)
+    const currentWeekStart = new Date(now.setDate(currentDiff))
+    currentWeekStart.setHours(0, 0, 0, 0)
+    const currentWeekTime = currentWeekStart.getTime()
+
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000
+
+    let currentStreak = 0
+    let activeStreak = false
+    
+    if (uniqueWeeks.length > 0) {
+      const newestWeek = uniqueWeeks[0]
+      if (newestWeek === currentWeekTime || newestWeek === currentWeekTime - oneWeekMs) {
+        activeStreak = true
+        currentStreak = 1
+        let expectedWeek = newestWeek - oneWeekMs
+        for (let i = 1; i < uniqueWeeks.length; i++) {
+          if (uniqueWeeks[i] === expectedWeek) {
+            currentStreak++
+            expectedWeek -= oneWeekMs
+          } else if (uniqueWeeks[i] < expectedWeek) {
+            break;
+          }
+        }
+      }
+    }
+
+    let bestStreak = 0
+    if (uniqueWeeks.length > 0) {
+      const sortedWeeksAsc = [...uniqueWeeks].sort((a, b) => a - b)
+      let tempStreak = 1
+      bestStreak = 1
+      for (let i = 1; i < sortedWeeksAsc.length; i++) {
+        if (sortedWeeksAsc[i] === sortedWeeksAsc[i - 1] + oneWeekMs) {
+          tempStreak++
+          if (tempStreak > bestStreak) {
+            bestStreak = tempStreak
+          }
+        } else {
+          tempStreak = 1
+        }
+      }
+    }
+
+    const streak = {
+      currentStreak,
+      bestStreak,
+      activeStreak,
+      workedOutThisWeek: uniqueWeeks.includes(currentWeekTime)
+    }
+
     return {
       workoutsCount,
       routinesCount,
       progressCount,
-      recentWorkouts
+      recentWorkouts,
+      streak
     }
   } catch (error) {
     console.error('getDashboardStats error:', error)
@@ -67,7 +142,13 @@ export async function getDashboardStats() {
       workoutsCount: 0,
       routinesCount: 0,
       progressCount: 0,
-      recentWorkouts: []
+      recentWorkouts: [],
+      streak: {
+        currentStreak: 0,
+        bestStreak: 0,
+        activeStreak: false,
+        workedOutThisWeek: false
+      }
     }
   }
 }
@@ -80,7 +161,7 @@ export async function getProgressStats() {
   try {
     // 1. Personal Records
     const prsResult = await pool.query(
-      `SELECT e.name as exercise, p.weight, p."recordedat" as date
+      `SELECT p.id, e.name as exercise, p.weight, p.maxweight as "maxWeight", p."recordedat" as date
        FROM "progress" p
        JOIN "exercise" e ON p."exerciseid" = e.id
        WHERE p."userid" = $1
@@ -88,8 +169,10 @@ export async function getProgressStats() {
       [userId]
     )
     const personalRecords = prsResult.rows.map(row => ({
+      id: row.id,
       exercise: row.exercise,
       weight: parseFloat(row.weight) || 0,
+      maxWeight: parseFloat(row.maxWeight) || 0,
       date: row.date.toISOString().split('T')[0]
     }))
 
@@ -424,6 +507,23 @@ export async function getAIWorkoutInsights() {
         workoutFrequency: []
       }
     }
+  }
+}
+
+export async function deleteProgressRecord(id: number) {
+  const session = await getSession()
+  if (!session?.user) throw new Error('Unauthorized')
+  const userId = session.user.id
+
+  try {
+    await pool.query(
+      'DELETE FROM "progress" WHERE id = $1 AND "userid" = $2',
+      [id, userId]
+    )
+    return { success: true }
+  } catch (error) {
+    console.error('deleteProgressRecord error:', error)
+    throw new Error('Failed to delete progress record')
   }
 }
 
