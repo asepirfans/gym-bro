@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import DashboardClient from '@/components/dashboard-client'
 import { pool } from '@/lib/db'
 import Header from '@/components/header'
+import LandingPage from '@/components/landing-page'
 
 export default async function DashboardPage() {
   // Get session token from cookie
@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const sessionToken = cookieStore.get('better-auth.session_token')?.value
 
   if (!sessionToken) {
-    redirect('/sign-in')
+    return <LandingPage />
   }
 
   // Get user from session
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   )
 
   if (sessionResult.rows.length === 0) {
-    redirect('/sign-in')
+    return <LandingPage />
   }
 
   const session = { user: sessionResult.rows[0] }

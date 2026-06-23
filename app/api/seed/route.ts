@@ -1,8 +1,9 @@
-import { seedExercises } from '@/lib/seed'
+import { seedExercises, seedTemplates } from '@/lib/seed'
 
 export async function GET() {
   try {
     await seedExercises()
+    await seedTemplates()
     return Response.json({ success: true, message: 'Database seeded successfully' })
   } catch (error) {
     console.error('Seed error:', error)

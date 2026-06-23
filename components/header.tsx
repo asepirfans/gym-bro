@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dumbbell, Flame, ArrowLeft, LogOut } from 'lucide-react'
-import { getDashboardStats } from '@/app/actions/dashboard'
+import { getDashboardStats, logoutAction } from '@/app/actions/dashboard'
+import { GymBroLogo } from '@/components/ui/gymbro-logo'
 
 interface HeaderProps {
   title?: string
@@ -69,9 +70,9 @@ export default function Header({ title, backHref, actionButton, showLogout = fal
           
           {/* Logo + Flame (Evolving next to name) */}
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2 mr-1">
-              <Dumbbell className="h-6 w-6 text-orange-500" />
-              <span className="text-lg font-bold text-white tracking-tight">GymBro</span>
+            <Link href="/" className="flex items-center gap-3 mr-1">
+              <GymBroLogo className="h-8 w-8 drop-shadow-[0_0_6px_rgba(249,115,22,0.2)]" />
+              <span className="text-lg font-extrabold text-white tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">GymBro</span>
             </Link>
             
             {/* Evolving Flame */}
@@ -152,6 +153,16 @@ export default function Header({ title, backHref, actionButton, showLogout = fal
           >
             Exercises
           </Link>
+          <Link 
+            href="/profile" 
+            className={`text-sm font-medium transition ${
+              pathname?.startsWith('/profile') 
+                ? 'text-orange-500 font-semibold' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Profile
+          </Link>
         </nav>
 
         {/* Right Side: Action Button or Logout */}
@@ -161,9 +172,9 @@ export default function Header({ title, backHref, actionButton, showLogout = fal
           {showLogout && (
             <button
               onClick={async () => {
-                // Client-side logout trigger
-                document.cookie = 'better-auth.session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
-                router.push('/sign-in')
+                // Server-side logout trigger to delete HttpOnly cookie
+                await logoutAction()
+                router.push('/')
                 router.refresh()
               }}
               className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 cursor-pointer"

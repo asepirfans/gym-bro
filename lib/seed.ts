@@ -119,7 +119,59 @@ const exercises = [
   { name: 'Side Planks', category: 'core', description: 'Lateral core stabilization hold' },
   { name: 'Bicycle Crunches', category: 'core', description: 'Alternating rotational crunches' },
   { name: 'L-Sit', category: 'core', description: 'Static holds supporting bodyweight with legs parallel to floor' },
-  { name: 'Toes to Bar', category: 'core', description: 'Hanging core exercise raising toes to the bar' }
+  { name: 'Toes to Bar', category: 'core', description: 'Hanging core exercise raising toes to the bar' },
+  { name: 'Lateral Raises', category: 'shoulders', description: 'Standing lateral raise targeting side deltoids' },
+  { name: 'Tricep Dips', category: 'arms', description: 'Bodyweight or weighted dips focusing on triceps' }
+]
+
+const templates = [
+  {
+    name: 'Upper Day',
+    description: 'Rutinitas fokus tubuh bagian atas (dada, punggung, bahu, dan lengan).',
+    exercises: [
+      { name: 'Chest Press', sets: 3, reps: 10, weight: '45.00' },
+      { name: 'Chest Fly Machine', sets: 3, reps: 12, weight: '35.00' },
+      { name: 'Lat Pulldown', sets: 3, reps: 10, weight: '50.00' },
+      { name: 'Seated Cable Row', sets: 3, reps: 10, weight: '45.00' },
+      { name: 'Lateral Raises', sets: 3, reps: 12, weight: '10.00' },
+      { name: 'Tricep Dips', sets: 3, reps: 12, weight: '0.00' }
+    ]
+  },
+  {
+    name: 'Push Day',
+    description: 'Rutinitas latihan fokus otot dorong (dada, bahu, dan tricep).',
+    exercises: [
+      { name: 'Chest Press', sets: 4, reps: 8, weight: '45.00' },
+      { name: 'Dumbbell Shoulder Press', sets: 3, reps: 10, weight: '18.00' },
+      { name: 'Chest Fly Machine', sets: 3, reps: 12, weight: '40.00' },
+      { name: 'Dumbbell Lateral Raises', sets: 3, reps: 12, weight: '10.00' },
+      { name: 'Tricep Rope Pushdowns', sets: 3, reps: 12, weight: '20.00' }
+    ]
+  },
+  {
+    name: 'Pull Day',
+    description: 'Rutinitas latihan fokus otot tarik menggunakan alat/mesin (punggung, rear delts, dan bicep).',
+    exercises: [
+      { name: 'Lat Pulldown', sets: 3, reps: 10, weight: '50.00' },
+      { name: 'Seated Cable Row', sets: 3, reps: 10, weight: '45.00' },
+      { name: 'T-Bar Row', sets: 3, reps: 10, weight: '40.00' },
+      { name: 'Face Pulls', sets: 3, reps: 12, weight: '20.00' },
+      { name: 'Straight-Arm Cable Pulldown', sets: 3, reps: 12, weight: '25.00' },
+      { name: 'Cable Bicep Curls', sets: 3, reps: 12, weight: '15.00' }
+    ]
+  },
+  {
+    name: 'Leg Day',
+    description: 'Rutinitas latihan fokus tubuh bagian bawah (quads, hamstrings, glutes, dan calves).',
+    exercises: [
+      { name: 'Barbell Back Squats', sets: 4, reps: 8, weight: '80.00' },
+      { name: 'Romanian Deadlifts (RDL)', sets: 3, reps: 10, weight: '60.00' },
+      { name: 'Leg Press', sets: 3, reps: 10, weight: '120.00' },
+      { name: 'Leg Extensions', sets: 3, reps: 12, weight: '40.00' },
+      { name: 'Lying Leg Curls', sets: 3, reps: 12, weight: '30.00' },
+      { name: 'Standing Calf Raises', sets: 4, reps: 15, weight: '50.00' }
+    ]
+  }
 ]
 
 export async function seedExercises() {
@@ -146,6 +198,90 @@ export async function seedExercises() {
     console.log(`Seeding completed: Added ${insertedCount} new exercises.`)
   } catch (error) {
     console.error('Seed error:', error)
+    throw error
+  }
+}
+
+export async function seedTemplates() {
+  try {
+    console.log('Running database migrations (adding username, ispublic, & routineShare)...')
+    await pool.query('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS username text UNIQUE')
+    await pool.query('ALTER TABLE "routine" ADD COLUMN IF NOT EXISTS ispublic boolean NOT NULL DEFAULT false')
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "routineShare" (
+        id serial primary key,
+        routineid integer not null,
+        senderid text not null,
+        receiverid text not null,
+        status text not null default 'pending',
+        createdat timestamp not null default now()
+      )
+    `)
+
+    console.log('Seeding template routines...')
+    
+    // 0. Ensure system user exists to satisfy foreign key constraints
+    const systemUserQuery = await pool.query(
+      'SELECT id FROM "user" WHERE id = $1',
+      ['system']
+    )
+    if (systemUserQuery.rows.length === 0) {
+      await pool.query(
+        'INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)',
+        ['system', 'System Templates', 'system@gymbro.ai']
+      )
+    }
+
+    // 1. Get all system routine IDs to clean up
+    const systemRoutinesQuery = await pool.query(
+      'SELECT id FROM "routine" WHERE userid = $1',
+      ['system']
+    )
+    const systemRoutineIds = systemRoutinesQuery.rows.map(r => r.id)
+    
+    if (systemRoutineIds.length > 0) {
+      // Clean up routineExercise first
+      await pool.query(
+        'DELETE FROM "routineExercise" WHERE routineid = ANY($1)',
+        [systemRoutineIds]
+      )
+      // Clean up routine
+      await pool.query(
+        'DELETE FROM "routine" WHERE userid = $1',
+        ['system']
+      )
+    }
+
+    // 2. Insert new templates
+    for (const t of templates) {
+      const routineInsert = await pool.query(
+        'INSERT INTO "routine" (userid, name, description, isactive) VALUES ($1, $2, $3, $4) RETURNING id',
+        ['system', t.name, t.description, true]
+      )
+      const routineId = routineInsert.rows[0].id
+      
+      let orderIndex = 0
+      for (const ex of t.exercises) {
+        // Find exercise ID by name
+        const exQuery = await pool.query(
+          'SELECT id FROM "exercise" WHERE name = $1',
+          [ex.name]
+        )
+        
+        if (exQuery.rows.length > 0) {
+          const exerciseId = exQuery.rows[0].id
+          await pool.query(
+            'INSERT INTO "routineExercise" (routineid, exerciseid, sets, reps, weight, orderindex) VALUES ($1, $2, $3, $4, $5, $6)',
+            [routineId, exerciseId, ex.sets, ex.reps, ex.weight, orderIndex++]
+          )
+        } else {
+          console.warn(`Exercise not found when seeding template: ${ex.name}`)
+        }
+      }
+    }
+    console.log('Template routines seeding completed.')
+  } catch (error) {
+    console.error('Error seeding template routines:', error)
     throw error
   }
 }

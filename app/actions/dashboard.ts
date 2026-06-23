@@ -527,3 +527,15 @@ export async function deleteProgressRecord(id: number) {
   }
 }
 
+export async function logoutAction() {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  cookieStore.delete('better-auth.session_token')
+}
+
+export async function checkSessionAction() {
+  const session = await getSession()
+  return !!session?.user
+}
+
+
