@@ -1,0 +1,25 @@
+GymBro 3D workout figure
+
+Source: Ecorche by Charleeh, https://github.com/Charleeh/ecorche
+License: Creative Commons Attribution-ShareAlike 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Based on BodyParts3D, copyright The Database Center for Life Science
+(CC BY 4.0), https://dbarchive.biosciencedbc.jp/en/bodyparts3d/
+and Z-Anatomy by Gauthier Kervyn (CC BY-SA 4.0),
+https://www.z-anatomy.com/
+The upstream Z-Anatomy export was supplied by BodyExplorer / Johan Bellander:
+https://github.com/JohanBellander/BodyExplorer
+
+GymBro adaptations: deep-muscle layer removed; surfaces simplified and grouped
+into workout regions; vertex colors replaced by a workout-dependent heatmap;
+meshopt compression. Mesh adaptations remain CC BY-SA 4.0.
+
+Anatomy renders are adaptations of this model and are provided under CC BY-SA
+4.0. Captions accompanying the 3D figure include credit; keep that credit with
+the image when sharing. The model license does not change ownership of your workout data or
+license unrelated application code.
+
+Original attribution: /models/ANATOMY-ATTRIBUTION.md
+Full license: /models/CC-BY-SA-4.0.txt
+Preparation and checksums: /models/anatomy-manifest.json

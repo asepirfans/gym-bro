@@ -1,0 +1,20 @@
+{
+  "source": "https://github.com/Charleeh/ecorche",
+  "sourceSha256": "cc43a8b4f218bee5da78d6c1746bd21470d1d93c6878e33b4ccdbcfc7a72b98e",
+  "sha256": "0515234ee19b889618fd75b95e3c5e4b269fcac0e4ff26ccb7bb715057032354",
+  "bytes": 1048344,
+  "triangles": 166023,
+  "primitives": 8,
+  "groups": [
+    "neutral",
+    "bone",
+    "chest",
+    "back",
+    "legs",
+    "shoulders",
+    "arms",
+    "core"
+  ],
+  "license": "CC BY-SA 4.0",
+  "changes": "Removed deep layer; simplified, grouped by workout region, removed vertex colors, compressed with meshopt."
+}

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
+import { GymBroLogo } from '@/components/ui/gymbro-logo'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const router = useRouter()
@@ -58,22 +60,23 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
   return (
     <main className="min-h-svh bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-sm p-6">
+      <Card className="w-full max-w-md p-7 sm:p-9 bg-slate-900">
+        <div className="auth-brand-row"><Link href="/" className="brand text-white" aria-label="Kembali ke GymBro"><GymBroLogo className="h-9 w-9" /><span>GymBro.</span></Link><ThemeToggle /></div>
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {isSignUp ? 'Create an account' : 'Welcome back'}
+            {isSignUp ? 'Mulai jurnal latihanmu.' : 'Kembali ke ritmemu.'}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {isSignUp
-              ? 'Sign up to get started'
-              : 'Sign in to your account to continue'}
+              ? 'Satu akun untuk rutinitas, catatan set, dan progresmu.'
+              : 'Masuk untuk melanjutkan catatan dan sesi latihanmu.'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {isSignUp && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Nama</Label>
               <Input
                 id="name"
                 value={name}
@@ -95,7 +98,7 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Kata sandi</Label>
             <Input
               id="password"
               type="password"
@@ -113,22 +116,22 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             </p>
           )}
 
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button type="submit" disabled={loading} className="w-full bg-orange-500 hover:bg-orange-600 h-12">
             {loading
-              ? 'Please wait...'
+              ? 'Memproses...'
               : isSignUp
-                ? 'Create account'
-                : 'Sign in'}
+                ? 'Buat akun'
+                : 'Masuk'}
           </Button>
         </form>
 
         <p className="text-sm text-muted-foreground text-center mt-6">
-          {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+          {isSignUp ? 'Sudah punya akun? ' : 'Belum punya akun? '}
           <Link
             href={isSignUp ? '/sign-in' : '/sign-up'}
             className="text-foreground font-medium underline-offset-4 hover:underline"
           >
-            {isSignUp ? 'Sign in' : 'Sign up'}
+            {isSignUp ? 'Masuk' : 'Buat akun'}
           </Link>
         </p>
       </Card>

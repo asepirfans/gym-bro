@@ -184,10 +184,10 @@ export default function MuscleHeatmap({ data }: MuscleHeatmapProps) {
             <circle cx="235" cy="30" r="12" fill="#334155" stroke="#475569" strokeWidth="1" />
 
             {/* Labels */}
-            <text x="75" y="306" fill="#64748b" fontSize="10" fontWeight="700" textAnchor="middle">
+            <text x="75" y="306" fill="var(--muted-foreground)" fontSize="10" fontWeight="700" textAnchor="middle">
               FRONT VIEW
             </text>
-            <text x="235" y="306" fill="#64748b" fontSize="10" fontWeight="700" textAnchor="middle">
+            <text x="235" y="306" fill="var(--muted-foreground)" fontSize="10" fontWeight="700" textAnchor="middle">
               BACK VIEW
             </text>
 

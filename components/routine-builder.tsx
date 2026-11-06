@@ -122,7 +122,7 @@ export default function RoutineBuilder() {
   }
 
   if (fetching) {
-    return <div className="text-center text-slate-400 py-12">Loading routine builder...</div>
+    return <div role="status" className="text-center text-slate-400 py-12">Menyiapkan ruang rutinitasmu...</div>
   }
 
   const filteredExercises = dbExercises.filter((ex) => {
@@ -134,25 +134,25 @@ export default function RoutineBuilder() {
     <div className="space-y-6">
       <Card className="border-slate-800 bg-slate-900/50">
         <CardHeader>
-          <CardTitle>Routine Details</CardTitle>
-          <CardDescription>Name and describe your workout routine</CardDescription>
+          <CardTitle>Kenalan dengan rutinitasmu</CardTitle>
+          <CardDescription>Beri nama yang gampang kamu ingat</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Routine Name</Label>
+            <Label htmlFor="name">Nama rutinitas</Label>
             <Input
               id="name"
-              placeholder="e.g., Push Day"
+              placeholder="Contoh: Upper body santai"
               value={routineName}
               onChange={(e) => setRoutineName(e.target.value)}
               className="bg-slate-800"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
+            <Label htmlFor="description">Catatan singkat (opsional)</Label>
             <Input
               id="description"
-              placeholder="e.g., Chest, shoulders, and triceps focus"
+              placeholder="Contoh: Dada, bahu, dan trisep"
               value={routineDescription}
               onChange={(e) => setRoutineDescription(e.target.value)}
               className="bg-slate-800"
@@ -163,12 +163,13 @@ export default function RoutineBuilder() {
 
       <Card className="border-slate-800 bg-slate-900/50">
         <CardHeader>
-          <CardTitle>Exercises</CardTitle>
-          <CardDescription>Add exercises to your routine</CardDescription>
+          <CardTitle>Gerakan pilihanmu</CardTitle>
+          <CardDescription>Tambahkan gerakan, lalu atur set dan repetisinya</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <select
+              aria-label="Kategori gerakan rutinitas"
               value={selectedCategory}
               onChange={(e) => {
                 setSelectedCategory(e.target.value)
@@ -187,11 +188,12 @@ export default function RoutineBuilder() {
 
             <div className="flex flex-1 gap-2">
               <select
+                aria-label="Pilih gerakan rutinitas"
                 value={selectedExerciseId}
                 onChange={(e) => setSelectedExerciseId(e.target.value)}
-                className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize text-sm focus:outline-none focus:border-orange-500"
+                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize text-sm focus:outline-none focus:border-orange-500"
               >
-                <option value="">Select an exercise...</option>
+                <option value="">Pilih gerakan...</option>
                 {filteredExercises.map((ex) => (
                   <option key={ex.id} value={ex.id}>
                     {ex.name}
@@ -200,25 +202,26 @@ export default function RoutineBuilder() {
               </select>
               <Button onClick={addExercise} className="gap-2 bg-orange-500 hover:bg-orange-600 shrink-0">
                 <Plus className="h-4 w-4" />
-                Add
+                Tambah
               </Button>
             </div>
           </div>
 
           {exercises.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-slate-400">
-              No exercises added yet. Select an exercise and click Add.
+              Belum ada gerakan. Pilih satu di atas untuk mulai menyusun sesi.
             </div>
           ) : (
             <div className="space-y-3">
               {exercises.map((exercise, index) => (
-                <div key={index} className="flex items-end gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <div className="flex-1">
+                <div key={index} className="flex items-end gap-2 sm:gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:p-4">
+                  <div className="min-w-0 flex-1">
                     <p className="mb-2 font-semibold text-white">{exercise.exerciseName}</p>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-xs text-slate-400">Sets</label>
+                        <label htmlFor={`routine-sets-${index}`} className="text-xs text-slate-400">Set</label>
                         <input
+                          id={`routine-sets-${index}`}
                           type="number"
                           value={exercise.sets}
                           onChange={(e) => updateExercise(index, 'sets', parseInt(e.target.value))}
@@ -228,29 +231,33 @@ export default function RoutineBuilder() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400">Reps</label>
+                        <label htmlFor={`routine-reps-${index}`} className="text-xs text-slate-400">Reps</label>
                         <input
+                          id={`routine-reps-${index}`}
                           type="number"
                           value={exercise.reps || ''}
                           onChange={(e) => updateExercise(index, 'reps', e.target.value ? parseInt(e.target.value) : '')}
                           className="w-full rounded border border-slate-600 bg-slate-700 px-2 py-1 text-white"
-                          placeholder="Optional"
+                          placeholder="0"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400">Weight (kg)</label>
+                        <label htmlFor={`routine-weight-${index}`} className="text-xs text-slate-400">Beban (kg)</label>
                         <input
+                          id={`routine-weight-${index}`}
+                          inputMode="decimal"
                           type="text"
                           value={exercise.weight || ''}
                           onChange={(e) => updateExercise(index, 'weight', e.target.value)}
                           className="w-full rounded border border-slate-600 bg-slate-700 px-2 py-1 text-white"
-                          placeholder="Optional"
+                          placeholder="0"
                         />
                       </div>
                     </div>
                   </div>
                   <Button
                     onClick={() => removeExercise(index)}
+                    aria-label={`Hapus gerakan ${exercise.exerciseName}`}
                     variant="outline"
                     size="sm"
                     className="text-red-400 hover:text-red-300 border-slate-700"
@@ -266,7 +273,7 @@ export default function RoutineBuilder() {
 
       <div className="flex gap-3">
         <Button onClick={handleSave} disabled={loading} className="flex-1 bg-orange-500 hover:bg-orange-600 h-12 text-lg">
-          {loading ? 'Saving...' : 'Create Routine'}
+          {loading ? 'Menyimpan...' : 'Simpan rutinitas'}
         </Button>
       </div>
     </div>

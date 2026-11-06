@@ -71,7 +71,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border backdrop-blur-sm shadow-2xl shadow-black/50 flex gap-3 pr-10 pl-4 py-3.5 min-w-[280px] max-w-sm transition-all duration-300 ${styles[toast.type]} ${exiting ? 'opacity-0 translate-x-full scale-95' : 'opacity-100 translate-x-0 scale-100'}`}
+      className={`relative overflow-hidden rounded-2xl border shadow-sm flex gap-3 pr-10 pl-4 py-3.5 min-w-[280px] max-w-sm transition-all duration-200 ${styles[toast.type]} ${exiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
       style={{ willChange: 'transform, opacity' }}
     >
       {/* left accent bar */}
@@ -86,6 +86,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
       <button
         onClick={dismiss}
+        aria-label="Tutup pemberitahuan"
         className="absolute right-2.5 top-2.5 rounded-md p-0.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
       >
         <X className="h-3.5 w-3.5" />
@@ -113,18 +114,13 @@ interface ConfirmState {
 }
 
 function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => { if (!dialog.current?.open) dialog.current?.showModal() }, [])
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      {/* backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/60 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* top accent */}
-        <div className={`h-0.5 w-full ${state.danger ? 'bg-gradient-to-r from-red-600 to-red-400' : 'bg-gradient-to-r from-orange-600 to-amber-400'}`} />
+    <dialog ref={dialog} className="warm-dialog" aria-labelledby="confirm-title" onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose() }}>
+      <div>
         <div className="p-6">
-          <h3 className="text-base font-bold text-white mb-2">{state.title}</h3>
+          <h3 id="confirm-title" className="text-base font-bold text-white mb-2">{state.title}</h3>
           <p className="text-sm text-slate-400 leading-relaxed">{state.message}</p>
 
           <div className="flex gap-3 mt-6">
@@ -143,7 +139,7 @@ function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: () =>
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }
 
@@ -175,7 +171,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toast container */}
-      <div className="fixed bottom-6 right-4 z-[150] flex flex-col gap-2.5 items-end pointer-events-none">
+      <div className="toast-stack" aria-live="polite">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
             <ToastItem toast={t} onRemove={removeToast} />

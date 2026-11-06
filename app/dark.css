@@ -1,0 +1,106 @@
+.theme-toggle { display: inline-grid; place-items: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); }
+.theme-toggle:hover { background: var(--muted); }
+.landing-nav-actions, .auth-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.auth-brand-row { margin-bottom: 24px; }
+
+:root.dark {
+  color-scheme: dark;
+  --background: #1c1713;
+  --foreground: #f5eadd;
+  --card: #261f1a;
+  --primary: #e4a17d;
+  --primary-foreground: #251b14;
+  --secondary: #3d2d22;
+  --muted: #352a22;
+  --muted-foreground: #c2ad9a;
+  --border: #534235;
+  --chart-bar: #e4a17d;
+  --chart-line: #b3c69b;
+  --color-slate-950: var(--background);
+  --color-slate-900: var(--card);
+  --color-slate-850: #2c241d;
+  --color-slate-800: #352b23;
+  --color-slate-700: #534235;
+  --color-slate-600: #c2ad9a;
+  --color-slate-500: #c2ad9a;
+  --color-slate-400: #c2ad9a;
+  --color-slate-300: #dbc8b5;
+  --color-slate-200: #f5eadd;
+  --color-slate-100: #f5eadd;
+  --color-slate-50: #f5eadd;
+  --color-orange-950: #38261d;
+  --color-orange-900: #654530;
+  --color-orange-600: #cf8d69;
+  --color-orange-500: #e4a17d;
+  --color-orange-400: #efb18b;
+  --color-orange-300: #efb18b;
+  --color-amber-950: #352c1b;
+  --color-amber-400: #e1c184;
+  --color-amber-300: #e1c184;
+  --color-green-950: #222c1d;
+  --color-green-500: #9cba85;
+  --color-green-400: #b3c69b;
+  --color-green-300: #b3c69b;
+  --color-emerald-400: #9cc2a4;
+  --color-emerald-950: #202b23;
+  --color-blue-950: #202b30;
+  --color-blue-400: #9fc1cf;
+  --color-blue-300: #9fc1cf;
+  --color-purple-400: #c4a6d0;
+  --color-purple-500: #bca1c6;
+  --color-pink-500: #dba4b1;
+  --color-yellow-500: #d6b471;
+  --color-red-950: #39211d;
+  --color-red-400: #f0a69b;
+  --color-red-300: #f0a69b;
+}
+
+.dark .brand, .dark .landing, .dark .hero-journal, .dark .warm-dialog { color: var(--foreground); }
+.dark .landing { background: var(--background); }
+.dark :is(.app-header, .app-bottom-nav, .dashboard-metrics a, .consistency-summary, .training-calendar, .routine-card, .exercise-card, .hero-journal, .warm-dialog, .app-secondary-action) { background: var(--card); border-color: var(--border); }
+.dark :is(.section-caption, .page-intro p:last-child, .consistency-summary p, .calendar-subtitle, .calendar-weekday, .calendar-legend, .calendar-session p, .calendar-empty > span, .calendar-footnote, .routine-filter-tabs > button, .routine-card-footer > span, .app-header-nav a, .app-bottom-nav a, .landing-nav nav, .hero-kicker, .hero-description, .hero-note, .hero-demo-link, .journal-top, .journal-title p, .journal-target > span, .journal-target strong > span, .journal-table-head, .journal-row .set-number, .journal-row small, .journal-bottom p, .journal-bottom strong > span, .journal-completion, .journal-footer, .demo-disclaimer, .journal-note, .training-principle, .process-intro > p:last-child, .process-list p, .consistency-copy > p:not(.section-caption), .landing-footer p, .landing-footer > span, .dashboard-metrics span) { color: var(--muted-foreground); }
+.dark :is(.text-link, .brand-dot, .hero-copy h1 em, .consistency-copy h2 em, .process-list article > svg, .training-principle > span > svg, .calendar-session > svg, .dashboard-metrics svg) { color: var(--primary); }
+.dark :is(.app-primary-action, .landing-cta, .bg-orange-500, [data-slot='button'].bg-orange-500) { background: var(--primary); color: var(--primary-foreground); }
+.dark :is(.app-primary-action, .landing-cta):hover { background: #efb18b; }
+.dark .app-secondary-action { color: var(--foreground); }
+.dark :is(.app-header-nav a[aria-current], .app-bottom-nav a[aria-current], .calendar-summary, .routine-type, .journal-title > svg) { background: var(--secondary); color: var(--primary); }
+.dark .app-header-nav a:hover { color: var(--foreground); background: var(--muted); }
+.dark :is(input:not([type='checkbox']), select, textarea) { border-color: #9b8069; }
+.dark :is(input, textarea)::placeholder { color: var(--muted-foreground); }
+.dark input[type='checkbox'] { accent-color: var(--primary); }
+.dark :where(a, button, input, select, textarea, summary):focus-visible { outline-color: var(--primary); }
+.dark .hero-journal-wrap { background: #3d2c22; }
+.dark :is(.next-session-card, .consistency-visual, .app-streak) { background: #293022; border-color: #4e5b40; color: #b3c69b; }
+.dark :is(.next-session-card > p, .next-session-card > svg, .consistency-summary > svg, .sample-calendar-heading small, .sample-week, .consistency-visual > p, .journal-top > span:first-child) { color: #b3c69b; }
+.dark .next-session-card .app-secondary-action { background: #323b2a; border-color: #667551; }
+.dark :is(.calendar-month-nav button, .routine-filter-tabs, .journal-completion > div) { background: var(--muted); border-color: var(--border); color: var(--foreground); }
+.dark :is(.calendar-day, .calendar-empty > svg) { color: var(--muted-foreground); }
+.dark :is(.calendar-month-nav button:hover, .calendar-day:hover, .journal-row button:hover) { background: #483527; }
+.dark .calendar-day.has-workout, .dark .calendar-legend svg { background: #4b3223; color: #f1bc96; }
+.dark .calendar-day.has-workout::before { background: #4b3223; }
+.dark :is(.calendar-day.is-today, .today-key) { border-color: #bd9471; }
+.dark .calendar-day.is-selected { color: var(--primary-foreground); background: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); }
+.dark .calendar-day.is-selected::before { background: var(--primary); }
+.dark .calendar-day:focus-visible { outline-color: #f5eadd; }
+.dark .calendar-day.is-selected:focus-visible { outline-color: #251b14; }
+.dark :is(.calendar-detail, .calendar-session, .routine-card-footer, .landing-login, .journal-target, .journal-row, .journal-footer, .training-principle, .process-list article, .landing-footer, .journal-row button) { border-color: var(--border); }
+.dark .calendar-session { background: #30261e; }
+.dark .calendar-error { color: #f0a69b; }
+.dark .routine-filter-tabs > button[aria-pressed='true'] { background: var(--card); color: var(--primary); }
+.dark .routine-card:nth-child(3n + 1) { background: #30251d; }
+.dark .routine-card:nth-child(3n + 2) { background: #282b21; }
+.dark :is(.routine-card:hover, .dashboard-metrics a:hover) { border-color: #bd9471; }
+.dark .warm-dialog::backdrop { background: #0d0908b3; }
+.dark .journal-dot, .dark .journal-completion > div > span { background: #b3c69b; }
+.dark .set-check-empty { border-color: #b79a80; }
+.dark ::selection { background: #e4a17d; color: #251b14; }
+
+@media (max-width: 380px) {
+  .app-header-inner { padding: 14px 16px; gap: 8px; }
+  .app-header-brand { gap: 6px; }
+  .app-header-actions { gap: 6px; }
+  .brand { font-size: 22px; gap: 7px; }
+  .app-streak { padding: 5px; gap: 3px; }
+  .landing-nav { gap: 10px; }
+  .landing-login { padding: 10px; gap: 6px; }
+}

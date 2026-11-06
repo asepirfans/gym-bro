@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, boolean, serial, integer, decimal } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, serial, integer, decimal, date, uniqueIndex, check } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 // --- Better Auth required tables -------------------------------------------
 // Column names are camelCase to match Better Auth's defaults. Do not rename.
@@ -147,6 +148,17 @@ export const progress = pgTable('progress', {
   totalVolume: decimal('totalvolume', { precision: 10, scale: 2 }),
   recordedAt: timestamp('recordedat').notNull().defaultNow(),
 })
+
+export const bodyWeight = pgTable('bodyWeight', {
+  id: serial('id').primaryKey(),
+  userId: text('userid').notNull(),
+  recordedOn: date('recordedon', { mode: 'string' }).notNull(),
+  weight: decimal('weight', { precision: 6, scale: 2 }).notNull(),
+  createdAt: timestamp('createdat').notNull().defaultNow(),
+}, table => [
+  uniqueIndex('body_weight_user_date').on(table.userId, table.recordedOn),
+  check('body_weight_positive', sql`${table.weight} > 0 AND ${table.weight} <= 1000`),
+])
 
 export const routineShare = pgTable('routineShare', {
   id: serial('id').primaryKey(),

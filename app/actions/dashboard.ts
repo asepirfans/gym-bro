@@ -9,30 +9,21 @@ export async function getDashboardStats() {
   const userId = session.user.id
 
   try {
-    // 1. Workouts this week
-    const workoutsResult = await pool.query(
+    const [workoutsResult, routinesResult, progressResult, recentWorkoutsResult, allWorkoutsResult] = await Promise.all([
+      pool.query(
       `SELECT COUNT(*) FROM "workout" 
        WHERE "userid" = $1 AND "startedat" >= NOW() - INTERVAL '7 days'`,
       [userId]
-    )
-    const workoutsCount = parseInt(workoutsResult.rows[0].count) || 0
-
-    // 2. Routines count
-    const routinesResult = await pool.query(
+      ),
+      pool.query(
       `SELECT COUNT(*) FROM "routine" WHERE "userid" = $1 AND "isactive" = true`,
       [userId]
-    )
-    const routinesCount = parseInt(routinesResult.rows[0].count) || 0
-
-    // 3. Personal Records count
-    const progressResult = await pool.query(
+      ),
+      pool.query(
       `SELECT COUNT(*) FROM "progress" WHERE "userid" = $1`,
       [userId]
-    )
-    const progressCount = parseInt(progressResult.rows[0].count) || 0
-
-    // 4. Recent Workouts
-    const recentWorkoutsResult = await pool.query(
+      ),
+      pool.query(
       `SELECT w.id, w.name as "workoutName", r.name as "routineName", w."startedat", w."completedat", w.duration, 
               (SELECT COUNT(*) FROM "workoutSet" ws WHERE ws."workoutid" = w.id) as "exerciseCount"
        FROM "workout" w
@@ -41,8 +32,18 @@ export async function getDashboardStats() {
        ORDER BY w."startedat" DESC
        LIMIT 5`,
       [userId]
-    )
-    
+      ),
+      pool.query(
+        `SELECT "startedat" FROM "workout"
+         WHERE "userid" = $1 AND "completedat" IS NOT NULL
+         ORDER BY "startedat" DESC`,
+        [userId]
+      ),
+    ])
+    const workoutsCount = parseInt(workoutsResult.rows[0].count) || 0
+    const routinesCount = parseInt(routinesResult.rows[0].count) || 0
+    const progressCount = parseInt(progressResult.rows[0].count) || 0
+
     const recentWorkouts = recentWorkoutsResult.rows.map(w => ({
       id: w.id,
       name: w.workoutName || w.routineName || 'Quick Workout',
@@ -54,14 +55,6 @@ export async function getDashboardStats() {
       duration: w.duration || 0,
       exercises: parseInt(w.exerciseCount) || 0
     }))
-
-    // 5. Calculate Weekly Streak
-    const allWorkoutsResult = await pool.query(
-      `SELECT "startedat" FROM "workout"
-       WHERE "userid" = $1 AND "completedat" IS NOT NULL
-       ORDER BY "startedat" DESC`,
-      [userId]
-    )
 
     const workoutDates = allWorkoutsResult.rows.map(row => new Date(row.startedat))
 
@@ -159,25 +152,16 @@ export async function getProgressStats() {
   const userId = session.user.id
 
   try {
-    // 1. Personal Records
-    const prsResult = await pool.query(
+    const [prsResult, dailyVolumeResult, monthlyProgressResult, muscleGroupResult] = await Promise.all([
+      pool.query(
       `SELECT p.id, e.name as exercise, p.weight, p.maxweight as "maxWeight", p."recordedat" as date
        FROM "progress" p
        JOIN "exercise" e ON p."exerciseid" = e.id
        WHERE p."userid" = $1
        ORDER BY p."recordedat" DESC`,
       [userId]
-    )
-    const personalRecords = prsResult.rows.map(row => ({
-      id: row.id,
-      exercise: row.exercise,
-      weight: parseFloat(row.weight) || 0,
-      maxWeight: parseFloat(row.maxWeight) || 0,
-      date: row.date.toISOString().split('T')[0]
-    }))
-
-    // 2. Weekly Volume
-    const dailyVolumeResult = await pool.query(
+      ),
+      pool.query(
       `SELECT TO_CHAR(w."startedat", 'Dy') as day, 
                SUM(COALESCE(ws.reps, 0) * COALESCE(ws.weight, 0))::integer as volume
        FROM "workout" w
@@ -186,20 +170,8 @@ export async function getProgressStats() {
        GROUP BY TO_CHAR(w."startedat", 'Dy'), DATE_TRUNC('day', w."startedat")
        ORDER BY DATE_TRUNC('day', w."startedat")`,
       [userId]
-    )
-    
-    // Map to standard 7 days
-    const dayMap: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 }
-    dailyVolumeResult.rows.forEach(row => {
-      const trimmedDay = row.day.trim()
-      if (trimmedDay in dayMap) {
-        dayMap[trimmedDay] = row.volume
-      }
-    })
-    const volumeData = Object.entries(dayMap).map(([date, volume]) => ({ date, volume }))
-
-    // 3. Monthly Workouts & Volume
-    const monthlyProgressResult = await pool.query(
+      ),
+      pool.query(
       `SELECT TO_CHAR(w."startedat", 'Mon') as month, 
               COUNT(DISTINCT w.id) as workouts,
               SUM(COALESCE(ws.reps, 0) * COALESCE(ws.weight, 0))::integer as "totalVolume",
@@ -210,16 +182,8 @@ export async function getProgressStats() {
        GROUP BY TO_CHAR(w."startedat", 'Mon'), DATE_TRUNC('month', w."startedat")
        ORDER BY DATE_TRUNC('month', w."startedat")`,
       [userId]
-    )
-    const monthlyProgress = monthlyProgressResult.rows.map(row => ({
-      month: row.month.trim(),
-      workouts: parseInt(row.workouts) || 0,
-      totalVolume: row.totalVolume || 0,
-      avgDuration: row.avgDuration || 0
-    }))
-
-    // 4. Muscle Group volume
-    const muscleGroupResult = await pool.query(
+      ),
+      pool.query(
       `SELECT e.category as muscle,
               SUM(COALESCE(ws.reps, 0) * COALESCE(ws.weight, 0))::integer as volume,
               SUM(COALESCE(ws.reps, 0))::integer as reps
@@ -229,7 +193,27 @@ export async function getProgressStats() {
        WHERE w."userid" = $1
        GROUP BY e.category`,
       [userId]
-    )
+      ),
+    ])
+    const personalRecords = prsResult.rows.map(row => ({
+      id: row.id,
+      exercise: row.exercise,
+      weight: parseFloat(row.weight) || 0,
+      maxWeight: parseFloat(row.maxWeight) || 0,
+      date: row.date.toISOString().split('T')[0]
+    }))
+    const dayMap: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 }
+    dailyVolumeResult.rows.forEach(row => {
+      const trimmedDay = row.day.trim()
+      if (trimmedDay in dayMap) dayMap[trimmedDay] = row.volume
+    })
+    const volumeData = Object.entries(dayMap).map(([date, volume]) => ({ date, volume }))
+    const monthlyProgress = monthlyProgressResult.rows.map(row => ({
+      month: row.month.trim(),
+      workouts: parseInt(row.workouts) || 0,
+      totalVolume: row.totalVolume || 0,
+      avgDuration: row.avgDuration || 0
+    }))
     const muscleGroupData = muscleGroupResult.rows.map(row => ({
       muscle: row.muscle.charAt(0).toUpperCase() + row.muscle.slice(1),
       volume: row.volume || 0,
@@ -368,7 +352,7 @@ export async function getAIWorkoutInsights() {
     if (lastWeek > 0) {
       const freqDiff = thisWeek - lastWeek
       if (freqDiff > 0) {
-        insightsList.push({ type: 'success', text: `Frekuensi latihan naik ${freqDiff} sesi dibanding minggu lalu (${lastWeek} → ${thisWeek} sesi). Konsistensi terjaga! 🔥` })
+        insightsList.push({ type: 'success', text: `Frekuensi latihan naik ${freqDiff} sesi dibanding minggu lalu (${lastWeek} ke ${thisWeek} sesi). Konsistensi terjaga.` })
       } else if (freqDiff < 0) {
         insightsList.push({ type: 'warning', text: `Frekuensi latihan turun ${Math.abs(freqDiff)} sesi dibanding minggu lalu (${lastWeek} → ${thisWeek} sesi). Jaga konsistensinya!` })
       } else {
@@ -382,7 +366,7 @@ export async function getAIWorkoutInsights() {
     if (volLast > 0) {
       const pct = Math.round(((volThis - volLast) / volLast) * 100)
       if (pct >= 10) {
-        insightsList.push({ type: 'success', text: `Total volume bulan ini naik ${pct}% dibanding bulan lalu. Progressive overload berjalan baik! 💪` })
+        insightsList.push({ type: 'success', text: `Total volume bulan ini naik ${pct}% dibanding bulan lalu.` })
       } else if (pct <= -10) {
         insightsList.push({ type: 'warning', text: `Total volume bulan ini turun ${Math.abs(pct)}% dibanding bulan lalu. Pertimbangkan menambah beban atau sesi.` })
       }
@@ -454,7 +438,7 @@ export async function getAIWorkoutInsights() {
     // --- Dynamic Rule 7: Recent PRs ---
     if (prRows.length > 0) {
       const prNames = prRows.slice(0, 2).map((r: any) => r.name).join(' & ')
-      insightsList.push({ type: 'success', text: `Personal Record baru: ${prNames}! Performa terbaikmu selama ini. 🏆` })
+      insightsList.push({ type: 'success', text: `Personal Record baru: ${prNames}.` })
     }
 
     // Fallback
@@ -469,7 +453,7 @@ export async function getAIWorkoutInsights() {
       const progressPct = prev > 0 ? Math.round(((recent - prev) / prev) * 100) : 0
       return {
         name: ep.name,
-        lastMonth: prev > 0 ? `${prev}kg × ${ep.max_r_prev}` : '—',
+        lastMonth: prev > 0 ? `${prev}kg × ${ep.max_r_prev}` : 'Belum ada',
         thisMonth: `${recent}kg × ${ep.max_r_recent}`,
         progress: prev > 0 ? (progressPct >= 0 ? `+${progressPct}%` : `${progressPct}%`) : 'New'
       }

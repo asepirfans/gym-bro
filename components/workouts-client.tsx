@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Trash2, Share2, Edit2, Check, X } from 'lucide-react'
-import { getUserWorkouts, deleteWorkout, updateWorkoutName } from '@/app/actions/workouts'
+import { deleteWorkout, updateWorkoutName } from '@/app/actions/workouts'
 import ShareWorkoutModal from '@/components/share-workout-modal'
 import ActiveWorkoutBanner from '@/components/active-workout-banner'
+import WorkoutCalendar from '@/components/workout-calendar'
 import { useToast } from '@/components/toast-provider'
 
 interface Workout {
@@ -20,27 +21,17 @@ interface Workout {
   notes: string | null
 }
 
-export default function WorkoutsClient({ userId }: { userId: string }) {
-  const [workouts, setWorkouts] = useState<Workout[]>([])
-  const [loading, setLoading] = useState(true)
+export default function WorkoutsClient({ userId, initialWorkouts }: { userId: string; initialWorkouts: Workout[] }) {
+  const [workouts, setWorkouts] = useState<Workout[]>(initialWorkouts)
+  const [showAll, setShowAll] = useState(false)
+  const [timeZone, setTimeZone] = useState('UTC')
   const [shareWorkoutId, setShareWorkoutId] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
   const { confirm, success, error } = useToast()
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getUserWorkouts()
-        setWorkouts(data as any)
-      } catch (err) {
-        console.error('Failed to load workouts:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  useEffect(() => { setWorkouts(initialWorkouts) }, [initialWorkouts])
+  useEffect(() => { setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone) }, [])
 
   const handleDelete = (id: number) => {
     confirm({
@@ -74,7 +65,8 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
   }
 
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString('id-ID', {
+      timeZone,
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -84,24 +76,21 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
     })
   }
 
-  if (loading) {
-    return <div className="text-center text-slate-400 py-12">Loading workouts history...</div>
-  }
-
   return (
     <div className="space-y-4">
       <ActiveWorkoutBanner userId={userId} />
+      <WorkoutCalendar workouts={workouts} />
       {workouts.length === 0 ? (
         <Card className="border-slate-800 bg-slate-900/50 p-8 text-center">
-          <p className="mb-4 text-slate-400">No workouts logged yet</p>
+          <p className="mb-4 text-slate-400">Belum ada sesi.</p>
           <Link href="/workouts/start">
-            <Button className="bg-orange-500 hover:bg-orange-600">Log Your First Workout</Button>
+            <Button className="bg-orange-500 hover:bg-orange-600">Mulai latihan</Button>
           </Link>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {workouts.map((workout) => (
-            <Card key={workout.id} className="border-slate-800 bg-slate-900/50 p-6">
+        <><div id="workout-history-list" className="grid gap-4">
+          {(showAll ? workouts : workouts.slice(0, 5)).map((workout) => (
+            <Card key={workout.id} className="history-row border-slate-800 bg-slate-900 p-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   {editingId === workout.id ? (
@@ -117,6 +106,7 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
                         size="icon"
                         variant="ghost"
                         onClick={() => handleSaveName(workout.id)}
+                        aria-label="Simpan nama sesi"
                         className="text-green-400 hover:text-green-300 hover:bg-slate-800 h-8 w-8"
                       >
                         <Check className="h-4 w-4" />
@@ -125,6 +115,7 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
                         size="icon"
                         variant="ghost"
                         onClick={() => setEditingId(null)}
+                        aria-label="Batalkan perubahan nama"
                         className="text-red-400 hover:text-red-300 hover:bg-slate-800 h-8 w-8"
                       >
                         <X className="h-4 w-4" />
@@ -136,6 +127,7 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
                         {workout.name || workout.routineName || 'Quick Workout'}
                       </h3>
                       <button
+                        aria-label={`Ubah nama sesi ${workout.name || workout.routineName || 'Latihan bebas'}`}
                         onClick={() => {
                           setEditingId(workout.id)
                           setEditValue(workout.name || workout.routineName || 'Quick Workout')
@@ -167,12 +159,13 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
                     className="text-orange-400 hover:text-orange-300 border-slate-700 hover:bg-slate-800 gap-1.5"
                   >
                     <Share2 className="h-4 w-4" />
-                    Share
+                    Bagikan
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleDelete(workout.id)}
+                    aria-label={`Hapus sesi ${workout.name || workout.routineName || 'Latihan bebas'}`}
                     className="text-red-400 hover:text-red-300 border-slate-700 hover:bg-slate-800"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -181,7 +174,7 @@ export default function WorkoutsClient({ userId }: { userId: string }) {
               </div>
             </Card>
           ))}
-        </div>
+        </div>{workouts.length > 5 && <div className="flex justify-center"><Button variant="outline" aria-controls="workout-history-list" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? 'Tampilkan lebih sedikit' : `Tampilkan lainnya (${workouts.length - 5})`}</Button></div>}</>
       )}
 
       <ShareWorkoutModal

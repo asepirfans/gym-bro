@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Trash2, Play, Dumbbell, User, Sparkles, Share2, Check, X, RefreshCw, Loader2, Mail, Send } from 'lucide-react'
+import { Trash2, Play, Dumbbell, User, LayoutTemplate, Share2, Check, X, RefreshCw, Loader2, Mail, Send } from 'lucide-react'
 import { getUserRoutines, getTemplateRoutines, deleteRoutine, shareRoutineToUser, getPendingSharedRoutines, respondToSharedRoutine } from '@/app/actions/routines'
 import { useToast } from '@/components/toast-provider'
 
@@ -31,12 +31,22 @@ export default function RoutinesClient() {
   const [pendingShares, setPendingShares] = useState<PendingShare[]>([])
   const [activeTab, setActiveTab] = useState<'custom' | 'templates' | 'shared'>('custom')
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const { confirm, success, error } = useToast()
 
   // Share Modal State
   const [sharingRoutineId, setSharingRoutineId] = useState<number | null>(null)
   const [shareTargetUsername, setShareTargetUsername] = useState('')
   const [shareLoading, setShareLoading] = useState(false)
+  const shareDialog = useRef<HTMLDialogElement>(null)
+  const shareInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (sharingRoutineId !== null && !shareDialog.current?.open) {
+      shareDialog.current?.showModal()
+      shareInput.current?.focus()
+    }
+  }, [sharingRoutineId])
 
   useEffect(() => {
     async function load() {
@@ -51,6 +61,7 @@ export default function RoutinesClient() {
         setPendingShares(sharedData as any)
       } catch (err) {
         console.error('Failed to load routines:', err)
+        setLoadFailed(true)
       } finally {
         setLoading(false)
       }
@@ -119,45 +130,33 @@ export default function RoutinesClient() {
   }
 
   if (loading) {
-    return <div className="text-center text-slate-400 py-12">Loading routines...</div>
+    return <div role="status" className="text-center text-slate-400 py-12">Menyiapkan rutinitasmu...</div>
   }
+  if (loadFailed) return <div role="alert" className="rounded-2xl border border-border bg-card p-8 text-center space-y-4"><p>Rutinitasmu belum bisa dimuat. Coba sebentar lagi, ya.</p><Button onClick={() => window.location.reload()} variant="outline">Coba lagi</Button></div>
 
   return (
     <div className="space-y-6">
-      {/* Category Tabs (Pill style - NO count numbers in headers) */}
-      <div className="flex p-1 rounded-xl bg-slate-900 border border-slate-800 max-w-lg mx-auto sm:mx-0">
+      <div className="routine-filter-tabs" role="group" aria-label="Pilihan rutinitas">
         <button
           onClick={() => setActiveTab('custom')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-300 ${
-            activeTab === 'custom'
-              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
+          aria-pressed={activeTab === 'custom'}
         >
           <User className="h-4 w-4" />
-          Custom
+          Punyaku
         </button>
         <button
           onClick={() => setActiveTab('templates')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-300 ${
-            activeTab === 'templates'
-              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
+          aria-pressed={activeTab === 'templates'}
         >
-          <Sparkles className="h-4 w-4" />
-          Templates
+          <LayoutTemplate className="h-4 w-4" />
+          Template
         </button>
         <button
           onClick={() => setActiveTab('shared')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-300 relative ${
-            activeTab === 'shared'
-              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
+          aria-pressed={activeTab === 'shared'}
         >
           <Mail className="h-4 w-4" />
-          Shared
+          Dari teman
           {pendingShares.length > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
               {pendingShares.length}
@@ -173,12 +172,12 @@ export default function RoutinesClient() {
             <div className="mx-auto w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-4">
               <Dumbbell className="h-6 w-6 text-slate-500" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Belum Ada Rutinitas Kustom</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Kasih tempat buat gerakan favoritmu.</h3>
             <p className="text-sm text-slate-400 mb-6 max-w-sm mx-auto">
-              Buat rutinitas latihan kustom pertama Anda untuk melacak olahraga harian Anda.
+              Pilih gerakan yang kamu suka, atur setnya, lalu simpan untuk sesi berikutnya.
             </p>
             <Link href="/routines/new">
-              <Button className="bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/25">
+              <Button className="bg-orange-500 hover:bg-orange-600">
                 Buat Rutinitas Pertama
               </Button>
             </Link>
@@ -188,15 +187,15 @@ export default function RoutinesClient() {
             {customRoutines.map((routine) => (
               <div
                 key={routine.id}
-                className="group flex flex-col justify-between rounded-xl border border-slate-800/80 bg-slate-900/40 p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-500/35 hover:bg-slate-900/60 hover:shadow-xl hover:shadow-orange-500/5"
+                className="routine-card"
               >
                 <div>
                   <div className="flex items-start justify-between gap-4">
                     <h3 className="font-semibold text-lg text-white group-hover:text-orange-400 transition-colors">
                       {routine.name}
                     </h3>
-                    <span className="shrink-0 text-[10px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md">
-                      Custom
+                    <span className="routine-type">
+                      Punyaku
                     </span>
                   </div>
                   {routine.description && (
@@ -204,7 +203,7 @@ export default function RoutinesClient() {
                   )}
                 </div>
 
-                <div className="mt-6 flex items-center justify-between border-t border-slate-800/60 pt-4">
+                <div className="routine-card-footer">
                   <span className="text-xs text-slate-500">
                     {routine.createdAt
                       ? `Dibuat: ${new Date(routine.createdAt).toLocaleDateString('id-ID')}`
@@ -215,13 +214,14 @@ export default function RoutinesClient() {
                     <Link href={`/workouts/start?routineId=${routine.id}`}>
                       <Button size="sm" className="gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-medium shadow-md shadow-orange-500/10 cursor-pointer">
                         <Play className="h-3.5 w-3.5 fill-current" />
-                        Start
+                        Latihan
                       </Button>
                     </Link>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => setSharingRoutineId(routine.id)}
+                      aria-label={`Bagikan rutinitas ${routine.name}`}
                       className="text-slate-300 hover:text-orange-400 border-slate-850 bg-slate-900/30 hover:bg-slate-850 cursor-pointer"
                       title="Bagikan ke Teman"
                     >
@@ -231,6 +231,7 @@ export default function RoutinesClient() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleDelete(routine.id)}
+                      aria-label={`Hapus rutinitas ${routine.name}`}
                       className="text-red-400 hover:text-red-300 border-slate-850 bg-slate-900/30 hover:bg-red-950/20 hover:border-red-900/30 cursor-pointer"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -249,14 +250,14 @@ export default function RoutinesClient() {
           {templateRoutines.map((routine) => (
             <div
               key={routine.id}
-              className="group flex flex-col justify-between rounded-xl border border-slate-800/80 bg-slate-900/40 p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-500/35 hover:bg-slate-900/60 hover:shadow-xl hover:shadow-orange-500/5"
+              className="routine-card"
             >
               <div>
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="font-semibold text-lg text-white group-hover:text-orange-400 transition-colors">
                     {routine.name}
                   </h3>
-                  <span className="shrink-0 text-[10px] font-bold tracking-wide uppercase bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-md">
+                  <span className="routine-type">
                     Template
                   </span>
                 </div>
@@ -265,12 +266,12 @@ export default function RoutinesClient() {
                 )}
               </div>
 
-              <div className="mt-6 flex items-center justify-between border-t border-slate-800/60 pt-4">
+              <div className="routine-card-footer">
                 <span className="text-xs text-slate-500">Bawaan Sistem</span>
                 <Link href={`/workouts/start?routineId=${routine.id}`}>
                   <Button size="sm" className="gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-medium shadow-md shadow-orange-500/10 cursor-pointer">
                     <Play className="h-3.5 w-3.5 fill-current" />
-                    Start
+                    Latihan
                   </Button>
                 </Link>
               </div>
@@ -286,9 +287,9 @@ export default function RoutinesClient() {
             <div className="mx-auto w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-4">
               <Mail className="h-6 w-6 text-slate-500" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Inbox Berbagi Kosong</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Kiriman teman masih kosong.</h3>
             <p className="text-sm text-slate-400 max-w-sm mx-auto">
-              Belum ada rutinitas latihan masuk dari teman-teman Anda saat ini.
+              Kalau ada rutinitas yang dibagikan, kamu bisa terima dan simpan di sini.
             </p>
           </div>
         ) : (
@@ -346,17 +347,17 @@ export default function RoutinesClient() {
 
       {/* SHARE MODAL DIALOG */}
       {sharingRoutineId !== null && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-850 bg-slate-900 p-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 to-amber-600"></div>
+        <dialog ref={shareDialog} className="warm-dialog" aria-labelledby="share-routine-title" onCancel={() => setSharingRoutineId(null)} onClick={event => { if (event.target === event.currentTarget) setSharingRoutineId(null) }}>
+          <div className="p-6">
             
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <h3 id="share-routine-title" className="text-lg font-bold text-white flex items-center gap-2">
                 <Share2 className="h-5 w-5 text-orange-500" />
                 Bagikan Rutinitas
               </h3>
               <button
                 onClick={() => setSharingRoutineId(null)}
+                aria-label="Tutup dialog berbagi"
                 className="text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -369,7 +370,7 @@ export default function RoutinesClient() {
 
             <form onSubmit={handleShareSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400">
+                <label htmlFor="share-username" className="text-xs font-semibold text-slate-400">
                   Username Teman Penerima
                 </label>
                 <div className="relative flex rounded-lg">
@@ -377,6 +378,8 @@ export default function RoutinesClient() {
                     @
                   </span>
                   <input
+                    id="share-username"
+                    ref={shareInput}
                     type="text"
                     value={shareTargetUsername}
                     onChange={(e) => setShareTargetUsername(e.target.value)}
@@ -416,7 +419,7 @@ export default function RoutinesClient() {
               </div>
             </form>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   )

@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { pool } from './db'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 const SALT = process.env.AUTH_SALT || 'default-salt'
 
@@ -80,7 +81,7 @@ export async function authenticateUser(email: string, password: string) {
   }
 }
 
-export async function getSession() {
+export const getSession = cache(async () => {
   try {
     const cookieStore = await cookies()
     const sessionToken = cookieStore.get('better-auth.session_token')?.value
@@ -110,4 +111,4 @@ export async function getSession() {
     console.error('getSession error:', error)
     return null
   }
-}
+})

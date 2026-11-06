@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/simple-auth'
 import ProgressAnalytics from '@/components/progress-analytics'
 import Header from '@/components/header'
+import PageIntro from '@/components/page-intro'
 
 export default async function ProgressPage() {
   const session = await getSession()
@@ -19,6 +20,7 @@ export default async function ProgressPage() {
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-6 py-8">
+        <PageIntro title="Progres" />
         <ProgressAnalytics />
       </div>
     </main>

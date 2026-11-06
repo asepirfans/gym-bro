@@ -199,18 +199,18 @@ export default function FloatingStreakWidget() {
           
           <div className="mt-2 space-y-1">
             <p className="text-sm font-extrabold text-white">
-              🔥 {streak.currentStreak} Minggu Konsisten!
+              {streak.currentStreak} Minggu Konsisten
             </p>
             <p className="text-xs text-slate-300 leading-relaxed mt-1">
               {streak.workedOutThisWeek ? (
-                <span className="text-green-400 font-medium">✓ Minggu ini sudah tuntas. Bagus!</span>
+                <span className="text-green-400 font-medium">Minggu ini sudah tuntas.</span>
               ) : (
-                <span className="text-amber-400 font-medium">⚠️ Belum latihan minggu ini. Jaga streak-mu!</span>
+                <span className="text-amber-400 font-medium">Belum latihan minggu ini. Jaga streak-mu.</span>
               )}
             </p>
             <div className="border-t border-slate-800/80 pt-2 mt-2 flex items-center justify-between text-[10px] text-slate-500 font-medium">
               <span>Rekor Terbaik</span>
-              <span className="text-slate-300 font-bold">🏆 {streak.bestStreak} Minggu</span>
+              <span className="text-slate-300 font-bold">{streak.bestStreak} Minggu</span>
             </div>
           </div>
         </div>

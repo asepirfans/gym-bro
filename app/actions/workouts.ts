@@ -1,9 +1,10 @@
 'use server'
 
 import { getSession } from '@/lib/simple-auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { groupPreviousSets, previousWorkoutSetsQuery } from '@/lib/workout-history'
 import { workout, workoutSet, progress, exercise } from '@/lib/db/schema'
-import { eq, and, desc, gt } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
 async function getUserId() {
@@ -221,11 +222,14 @@ export async function deleteWorkout(id: number) {
     .where(and(eq(workout.id, id), eq(workout.userId, userId)))
 
   revalidatePath('/workouts')
+  revalidatePath('/progress')
+  revalidatePath('/')
 }
 
 // Save completed workout with all sets
 export async function saveWorkout(data: {
   routineId?: number
+  startedAt?: string
   duration: number
   notes?: string
   completedExercises: {
@@ -238,6 +242,10 @@ export async function saveWorkout(data: {
   }[]
 }) {
   const userId = await getUserId()
+  const startedAt = data.startedAt ? new Date(data.startedAt) : new Date(Date.now() - data.duration * 60000)
+  if (!Number.isFinite(startedAt.getTime()) || startedAt.getTime() > Date.now() || data.duration < 1 || !Number.isFinite(data.duration)) {
+    throw new Error('Waktu latihan tidak valid')
+  }
   const routineTable = require('@/lib/db/schema').routine
   let name = 'Quick Workout'
 
@@ -258,7 +266,7 @@ export async function saveWorkout(data: {
       userId,
       routineId: data.routineId,
       name,
-      startedAt: new Date(Date.now() - data.duration * 60000),
+      startedAt,
       completedAt: new Date(),
       duration: data.duration,
       notes: data.notes,
@@ -282,6 +290,7 @@ export async function saveWorkout(data: {
 
   revalidatePath('/workouts')
   revalidatePath('/progress')
+  revalidatePath('/')
   return newWorkoutResult[0]
 }
 
@@ -301,51 +310,13 @@ export async function updateWorkoutName(id: number, name: string) {
 
 // Get previous logged sets for a specific exercise
 export async function getPreviousWorkoutSets(exerciseId: number) {
+  return (await getPreviousWorkoutSetsBatch([exerciseId]))[exerciseId] ?? []
+}
+
+export async function getPreviousWorkoutSetsBatch(exerciseIds: number[]) {
   const userId = await getUserId()
-
-  // 1. Find the most recent completed workout that has sets for this exercise
-  const recentWorkout = await db
-    .select({
-      id: workout.id,
-      completedAt: workout.completedAt,
-    })
-    .from(workout)
-    .innerJoin(workoutSet, eq(workoutSet.workoutId, workout.id))
-    .where(
-      and(
-        eq(workout.userId, userId),
-        eq(workoutSet.exerciseId, exerciseId),
-        gt(workout.completedAt, new Date(0)) // completed workouts
-      )
-    )
-    .orderBy(desc(workout.completedAt))
-    .limit(1)
-
-  if (recentWorkout.length === 0) {
-    return []
-  }
-
-  const workoutId = recentWorkout[0].id
-
-  // 2. Fetch all sets for this exercise from that specific workout
-  const sets = await db
-    .select({
-      setNumber: workoutSet.setNumber,
-      reps: workoutSet.reps,
-      weight: workoutSet.weight,
-    })
-    .from(workoutSet)
-    .where(
-      and(
-        eq(workoutSet.workoutId, workoutId),
-        eq(workoutSet.exerciseId, exerciseId)
-      )
-    )
-    .orderBy(workoutSet.setNumber)
-
-  return sets.map(s => ({
-    setNumber: s.setNumber,
-    reps: s.reps || undefined,
-    weight: s.weight ? s.weight.toString() : undefined
-  }))
+  if (!exerciseIds.every(id => Number.isSafeInteger(id) && id > 0)) throw new Error('Exercise IDs tidak valid')
+  if (!exerciseIds.length) return {}
+  const result = await pool.query(previousWorkoutSetsQuery, [userId, exerciseIds])
+  return groupPreviousSets(result.rows)
 }

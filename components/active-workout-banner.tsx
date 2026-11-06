@@ -6,10 +6,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Play, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/toast-provider'
+import { elapsedSecondsSince } from '@/lib/workout-clock'
 
 export default function ActiveWorkoutBanner({ userId }: { userId?: string }) {
   const router = useRouter()
   const [activeWorkout, setActiveWorkout] = useState<any>(null)
+  const [elapsed, setElapsed] = useState(0)
   const { confirm, success } = useToast()
 
   const storageKey = userId ? `gymbro_active_workout_${userId}` : 'gymbro_active_workout'
@@ -22,6 +24,7 @@ export default function ActiveWorkoutBanner({ userId }: { userId?: string }) {
           const parsed = JSON.parse(saved)
           if (parsed && parsed.workoutStarted) {
             setActiveWorkout(parsed)
+            if (parsed.actualStartTime) setElapsed(elapsedSecondsSince(parsed.actualStartTime))
             return
           }
         } catch (e) {
@@ -33,11 +36,15 @@ export default function ActiveWorkoutBanner({ userId }: { userId?: string }) {
 
     checkActive()
     window.addEventListener('storage', checkActive)
-    const interval = setInterval(checkActive, 3000)
+    const interval = setInterval(checkActive, 1000)
+    window.addEventListener('focus', checkActive)
+    document.addEventListener('visibilitychange', checkActive)
 
     return () => {
       window.removeEventListener('storage', checkActive)
       clearInterval(interval)
+      window.removeEventListener('focus', checkActive)
+      document.removeEventListener('visibilitychange', checkActive)
     }
   }, [storageKey])
 
@@ -70,7 +77,7 @@ export default function ActiveWorkoutBanner({ userId }: { userId?: string }) {
               Workout sedang berjalan!
             </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              Anda memiliki sesi aktif dengan {activeWorkout.exercises?.length || 0} latihan yang belum selesai.
+              {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')} berjalan · {activeWorkout.exercises?.length || 0} gerakan dalam sesi ini.
             </p>
           </div>
         </div>

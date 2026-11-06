@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Dumbbell, Trash2 } from 'lucide-react'
 import { getProgressStats, deleteProgressRecord } from '@/app/actions/dashboard'
-import MuscleHeatmap from '@/components/muscle-heatmap'
+import ProgressAnatomy from '@/components/progress-anatomy'
+import WorkoutCalendar from '@/components/workout-calendar'
 import { useToast } from '@/components/toast-provider'
+import BodyWeightTracker from '@/components/body-weight-tracker'
 
 interface ProgressData {
   personalRecords: { id: number; exercise: string; weight: number; maxWeight: number; date: string }[]
@@ -19,8 +21,13 @@ interface ProgressData {
 }
 
 export default function ProgressAnalytics() {
+  return <Tabs defaultValue="training" className="space-y-5"><TabsList><TabsTrigger value="training">Latihan</TabsTrigger><TabsTrigger value="weight">Berat badan</TabsTrigger></TabsList><TabsContent value="training" className="space-y-6"><WorkoutCalendar /><ProgressStatistics /></TabsContent><TabsContent value="weight"><BodyWeightTracker /></TabsContent></Tabs>
+}
+
+function ProgressStatistics() {
   const [data, setData] = useState<ProgressData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showAllRecords, setShowAllRecords] = useState(false)
   const { confirm, success, error } = useToast()
 
   const handleDeletePR = (id: number, exerciseName: string) => {
@@ -62,7 +69,7 @@ export default function ProgressAnalytics() {
   }, [])
 
   if (loading) {
-    return <div className="text-center text-slate-400 py-12">Loading progress analytics...</div>
+    return <div className="text-center text-slate-400 py-12">Memuat statistik progres...</div>
   }
 
   const hasData = data && (data.personalRecords.length > 0 || data.monthlyProgress.some(m => m.workouts > 0))
@@ -74,13 +81,13 @@ export default function ProgressAnalytics() {
           <Dumbbell className="h-8 w-8 text-orange-500" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white">No progress stats available</h3>
+          <h3 className="text-xl font-bold text-white">Catatan pertamamu ditunggu di sini.</h3>
           <p className="text-slate-400 text-sm">
-            Once you log your workouts and sets, we will automatically compile your strength progress, volume charts, and personal records here.
+            Selesaikan satu sesi, lalu lihat catatan beban, volume, dan rekor pribadimu tumbuh dari waktu ke waktu.
           </p>
         </div>
         <Link href="/workouts/start">
-          <Button className="bg-orange-500 hover:bg-orange-600 mt-2">Start Your First Workout</Button>
+          <Button className="bg-orange-500 hover:bg-orange-600 mt-2">Mulai latihan pertamamu</Button>
         </Link>
       </Card>
     )
@@ -95,16 +102,16 @@ export default function ProgressAnalytics() {
     : 0
 
   const stats = [
-    { label: 'Total Workouts', value: totalWorkouts.toString(), change: 'All time' },
-    { label: 'Total Volume', value: `${totalVolume.toLocaleString()} kg`, change: 'All time' },
+    { label: 'Sesi latihan', value: totalWorkouts.toString(), change: '6 bulan terakhir' },
+    { label: 'Total volume', value: `${totalVolume.toLocaleString()} kg`, change: '6 bulan terakhir' },
     {
-      label: 'Avg Workout',
+      label: 'Rata-rata durasi',
       value: avgDuration < 60
         ? `${avgDuration} min`
         : `${Math.floor(avgDuration / 60)} jam${avgDuration % 60 > 0 ? ` ${avgDuration % 60} min` : ''}`,
-      change: 'Average session duration'
+      change: 'Ringkasan durasi bulanan'
     },
-    { label: 'Personal Records', value: data.personalRecords.length.toString(), change: 'Unique exercises' },
+    { label: 'Rekor pribadi', value: data.personalRecords.length.toString(), change: 'Gerakan yang tercatat' },
   ]
 
   // Construct radar chart data
@@ -117,7 +124,7 @@ export default function ProgressAnalytics() {
   return (
     <div className="space-y-6">
       {/* Key Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.label} className="border-slate-800 bg-slate-900/50">
             <CardContent className="pt-6">
@@ -133,12 +140,12 @@ export default function ProgressAnalytics() {
       {data.personalRecords.length > 0 && (
         <Card className="border-slate-800 bg-slate-900/50">
           <CardHeader>
-            <CardTitle>Personal Records</CardTitle>
-            <CardDescription>Your best lifts</CardDescription>
+            <CardTitle>Angkatan terbaikmu</CardTitle>
+            <CardDescription>Catatan beban terbaru dan rekor pribadimu</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              {data.personalRecords.map((pr) => {
+            <div id="personal-records-list" className="grid gap-4 md:grid-cols-2">
+              {(showAllRecords ? data.personalRecords : data.personalRecords.slice(0, 5)).map((pr) => {
                 const diff = pr.weight - pr.maxWeight
                 const isDown = diff < 0
 
@@ -152,7 +159,8 @@ export default function ProgressAnalytics() {
                           size="icon"
                           variant="ghost"
                           onClick={() => handleDeletePR(pr.id, pr.exercise)}
-                          className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-slate-700/50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label={`Hapus rekor ${pr.exercise}`}
+                          className="h-11 w-11 text-slate-400 hover:text-red-400 hover:bg-slate-700/50 rounded-md"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -174,11 +182,11 @@ export default function ProgressAnalytics() {
                         <div className="mt-3 flex items-center gap-1.5 text-[11px]">
                           {pr.weight === pr.maxWeight ? (
                             <span className="text-emerald-400 bg-emerald-950/20 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-900/30">
-                              🏆 Beban Tertinggi Aktif
+                              Beban Tertinggi Aktif
                             </span>
                           ) : isDown ? (
                             <span className="text-red-400 bg-red-950/20 px-2.5 py-0.5 rounded-full font-semibold border border-red-900/30">
-                              📉 Turun {Math.abs(diff)} kg dari PR
+                              Turun {Math.abs(diff)} kg dari PR
                             </span>
                           ) : (
                             <span className="text-slate-400 bg-slate-950/20 px-2.5 py-0.5 rounded-full font-semibold border border-slate-800">
@@ -196,6 +204,7 @@ export default function ProgressAnalytics() {
                 )
               })}
             </div>
+            {data.personalRecords.length > 5 && <div className="mt-5 flex justify-center"><Button variant="outline" aria-controls="personal-records-list" aria-expanded={showAllRecords} onClick={() => setShowAllRecords(value => !value)}>{showAllRecords ? 'Tampilkan lebih sedikit' : `Tampilkan lainnya (${data.personalRecords.length - 5})`}</Button></div>}
           </CardContent>
         </Card>
       )}
@@ -203,27 +212,27 @@ export default function ProgressAnalytics() {
       {/* Charts */}
       <Tabs defaultValue="monthly" className="space-y-4">
         <TabsList className="bg-slate-800">
-          <TabsTrigger value="monthly">Monthly</TabsTrigger>
-          <TabsTrigger value="muscles">Muscle Groups</TabsTrigger>
+          <TabsTrigger value="monthly">Bulanan</TabsTrigger>
+          <TabsTrigger value="muscles">Kelompok otot</TabsTrigger>
         </TabsList>
 
         <TabsContent value="monthly" className="space-y-4">
           <Card className="border-slate-800 bg-slate-900/50">
             <CardHeader>
-              <CardTitle>Monthly Workouts</CardTitle>
-              <CardDescription>Number of workouts completed each month</CardDescription>
+              <CardTitle>Ritme latihan bulanan</CardTitle>
+              <CardDescription>Jumlah sesi yang sudah kamu selesaikan</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={data.monthlyProgress}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis dataKey="month" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e6ddcf" />
+                  <XAxis dataKey="month" stroke="var(--muted-foreground)" />
+                  <YAxis stroke="var(--muted-foreground)" allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#141414', border: '1px solid #333', borderRadius: '8px' }}
-                    labelStyle={{ color: '#e2e8f0' }}
+                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--foreground)' }}
+                    labelStyle={{ color: 'var(--foreground)' }}
                   />
-                  <Bar dataKey="workouts" fill="#f97316" />
+                  <Bar dataKey="workouts" name="Sesi selesai" fill="var(--chart-bar)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -231,20 +240,20 @@ export default function ProgressAnalytics() {
 
           <Card className="border-slate-800 bg-slate-900/50">
             <CardHeader>
-              <CardTitle>Total Volume Progression</CardTitle>
-              <CardDescription>Cumulative weight lifted each month</CardDescription>
+              <CardTitle>Pelan-pelan, bertambah</CardTitle>
+              <CardDescription>Total volume latihan setiap bulan, dalam kg</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={data.monthlyProgress}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis dataKey="month" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e6ddcf" />
+                  <XAxis dataKey="month" stroke="var(--muted-foreground)" />
+                  <YAxis stroke="var(--muted-foreground)" />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#141414', border: '1px solid #333', borderRadius: '8px' }}
-                    labelStyle={{ color: '#e2e8f0' }}
+                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--foreground)' }}
+                    labelStyle={{ color: 'var(--foreground)' }}
                   />
-                  <Line type="monotone" dataKey="totalVolume" stroke="#f97316" strokeWidth={2} dot={{ fill: '#f97316' }} />
+                  <Line type="monotone" dataKey="totalVolume" name="Volume (kg)" stroke="var(--chart-line)" strokeWidth={3} dot={{ fill: 'var(--chart-line)' }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -253,21 +262,21 @@ export default function ProgressAnalytics() {
 
         <TabsContent value="muscles" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <MuscleHeatmap data={data.muscleGroupData} />
+            <ProgressAnatomy data={data.muscleGroupData} />
 
             {radarData.length > 0 && (
               <Card className="border-slate-800 bg-slate-900/50">
                 <CardHeader>
-                  <CardTitle>Training Balance</CardTitle>
-                  <CardDescription>Relative intensity by muscle group (0-100)</CardDescription>
+                  <CardTitle>Kenali keseimbanganmu</CardTitle>
+                  <CardDescription>Perbandingan volume antar kelompok otot</CardDescription>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center">
                   <ResponsiveContainer width="100%" height={310}>
                     <RadarChart data={radarData}>
-                      <PolarGrid stroke="#333" />
-                      <PolarAngleAxis dataKey="name" stroke="#94a3b8" />
-                      <PolarRadiusAxis angle={90} domain={[0, 100]} stroke="#94a3b8" />
-                      <Radar name="Intensity" dataKey="value" stroke="#f97316" fill="#f97316" fillOpacity={0.4} />
+                      <PolarGrid stroke="var(--border)" />
+                      <PolarAngleAxis dataKey="name" stroke="var(--muted-foreground)" />
+                      <PolarRadiusAxis angle={90} domain={[0, 100]} stroke="var(--muted-foreground)" />
+                      <Radar name="Volume relatif" dataKey="value" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -277,20 +286,20 @@ export default function ProgressAnalytics() {
 
           <Card className="border-slate-800 bg-slate-900/50">
             <CardHeader>
-              <CardTitle>Muscle Group Volume</CardTitle>
-              <CardDescription>Total weight lifted by muscle group</CardDescription>
+              <CardTitle>Volume per kelompok otot</CardTitle>
+              <CardDescription>Kelompok otot yang sudah kamu latih</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={data.muscleGroupData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis type="number" stroke="#94a3b8" />
-                  <YAxis dataKey="muscle" type="category" stroke="#94a3b8" width={80} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e6ddcf" />
+                  <XAxis type="number" stroke="var(--muted-foreground)" />
+                  <YAxis dataKey="muscle" type="category" stroke="var(--muted-foreground)" width={80} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#141414', border: '1px solid #333', borderRadius: '8px' }}
-                    labelStyle={{ color: '#e2e8f0' }}
+                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--foreground)' }}
+                    labelStyle={{ color: 'var(--foreground)' }}
                   />
-                  <Bar dataKey="volume" fill="#f97316" />
+                  <Bar dataKey="volume" name="Volume (kg)" fill="var(--chart-bar)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

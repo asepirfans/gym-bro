@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { elapsedSecondsSince, remainingRestSeconds } from '@/lib/workout-clock'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Check, Plus, X, Play, Pause, Timer, Volume2 } from 'lucide-react'
-import { getRoutineExercises } from '@/app/actions/routines'
+import { Check, Plus, X, Play, Pause, Timer } from 'lucide-react'
+import { getWorkoutTemplate } from '@/app/actions/workout-template'
 import { getExercises } from '@/app/actions/exercises'
 import { saveWorkout, getPreviousWorkoutSets } from '@/app/actions/workouts'
 import { useToast } from '@/components/toast-provider'
@@ -38,6 +39,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
   const searchParams = useSearchParams()
   const routineIdStr = searchParams.get('routineId')
   const routineId = routineIdStr ? parseInt(routineIdStr) : undefined
+  const [activeRoutineId, setActiveRoutineId] = useState(routineId)
   const { warning, error: toastError, success, confirm } = useToast()
 
   const [exercises, setExercises] = useState<Exercise[]>([])
@@ -60,34 +62,78 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
   const [isRestActive, setIsRestActive] = useState(false)
   const [isRestPaused, setIsRestPaused] = useState(false)
   const [autoRestEnabled, setAutoRestEnabled] = useState(true)
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null)
+  const audioRef = useRef<AudioContext | null>(null)
+  const restFinishedRef = useRef(false)
 
   // Audio & Vibration helpers
-  const playRestChime = () => {
+  const prepareRestAudio = () => {
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-      if (!AudioContextClass) return
-      const ctx = new AudioContextClass()
-      const now = ctx.currentTime
-      
-      // Professional high-pitch chime: two quick clean synth beeps (A5 then C6)
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(880, now) // A5
-      osc.frequency.setValueAtTime(1046.5, now + 0.15) // C6
-      
-      gain.gain.setValueAtTime(0.08, now)
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35)
-      
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      
-      osc.start(now)
-      osc.stop(now + 0.35)
+      if (!audioRef.current) audioRef.current = new AudioContext()
+      void audioRef.current.resume().catch(() => {})
     } catch (e) {
       console.error('Web Audio chime failed:', e)
     }
   }
+
+  const startRest = (duration = defaultRestDuration) => {
+    if (!workoutStarted) startWorkout()
+    prepareRestAudio()
+    restFinishedRef.current = false
+    setRestEndsAt(Date.now() + duration * 1000)
+    setRestTimeRemaining(duration)
+    setIsRestActive(true)
+    setIsRestPaused(false)
+  }
+
+  const adjustRest = (seconds: number) => {
+    if (isRestPaused) {
+      const remaining = Math.max(0, restTimeRemaining + seconds)
+      setRestTimeRemaining(remaining)
+      if (!remaining) setIsRestActive(false)
+    } else if (restEndsAt !== null) {
+      setRestEndsAt(Math.max(Date.now(), restEndsAt + seconds * 1000))
+    }
+  }
+
+  const toggleRestPause = () => {
+    if (isRestPaused) {
+      prepareRestAudio()
+      setRestEndsAt(Date.now() + restTimeRemaining * 1000)
+      setIsRestPaused(false)
+    } else if (restEndsAt !== null) {
+      const remaining = remainingRestSeconds(restEndsAt)
+      setRestTimeRemaining(remaining)
+      setRestEndsAt(null)
+      setIsRestPaused(true)
+      if (!remaining) setIsRestActive(false)
+    }
+  }
+
+  // Schedule audio on the audio clock so a throttled JS interval does not delay it.
+  useEffect(() => {
+    const ctx = audioRef.current
+    if (!ctx || !isRestActive || isRestPaused || restEndsAt === null) return
+    const at = ctx.currentTime + Math.max(0, (restEndsAt - Date.now()) / 1000)
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.frequency.setValueAtTime(880, at)
+    osc.frequency.setValueAtTime(1046.5, at + 0.15)
+    gain.gain.setValueAtTime(0.08, at)
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.4)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(at)
+    osc.stop(at + 0.4)
+    let played = false
+    osc.onended = () => { played = true; osc.disconnect(); gain.disconnect() }
+    return () => {
+      // Let an alarm already playing finish when the display reaches zero.
+      if (!played && ctx.currentTime < at) osc.stop()
+    }
+  }, [restEndsAt, isRestPaused, isRestActive])
+
+  useEffect(() => () => { void audioRef.current?.close() }, [])
 
   const triggerVibration = () => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -97,23 +143,30 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
   // Countdown Timer useEffect
   useEffect(() => {
-    if (!isRestActive || isRestPaused || restTimeRemaining <= 0) return
-
-    const timer = setInterval(() => {
-      setRestTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          setIsRestActive(false)
-          playRestChime()
-          triggerVibration()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [isRestActive, isRestPaused, restTimeRemaining])
+    if (!isRestActive || isRestPaused || restEndsAt === null) return
+    const sync = () => {
+      const remaining = remainingRestSeconds(restEndsAt)
+      setRestTimeRemaining(remaining)
+      if (remaining === 0 && !restFinishedRef.current) {
+        restFinishedRef.current = true
+        setIsRestActive(false)
+        setRestEndsAt(null)
+        triggerVibration()
+        success('Istirahat selesai', 'Siap lanjut ke set berikutnya.')
+      }
+    }
+    sync()
+    const timer = setInterval(sync, 250)
+    window.addEventListener('focus', sync)
+    window.addEventListener('pageshow', sync)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', sync)
+      window.removeEventListener('pageshow', sync)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [isRestActive, isRestPaused, restEndsAt, success])
 
   const startWorkout = () => {
     setWorkoutStarted(true)
@@ -122,14 +175,20 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
   }
 
   useEffect(() => {
-    if (!workoutStarted) return
-
-    const timer = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1)
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [workoutStarted])
+    if (!workoutStarted || !actualStartTime || workoutCompleted) return
+    const sync = () => setElapsedSeconds(elapsedSecondsSince(actualStartTime))
+    sync()
+    const timer = setInterval(sync, 1000)
+    window.addEventListener('focus', sync)
+    window.addEventListener('pageshow', sync)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', sync)
+      window.removeEventListener('pageshow', sync)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [workoutStarted, actualStartTime, workoutCompleted])
 
   useEffect(() => {
     const hrs = Math.floor(elapsedSeconds / 3600)
@@ -149,22 +208,14 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
   const loadTemplate = async () => {
     setLoading(true)
+    setActiveRoutineId(routineId)
     try {
-      // Fetch all exercises from DB for the adding dropdown
-      const allExs = await getExercises()
-      setDbExercises(allExs as any)
+      const template = await getWorkoutTemplate(routineId)
+      setDbExercises(template.exercises)
 
       if (routineId) {
-        // Fetch routine exercises
-        const routineExs = await getRoutineExercises(routineId)
-        const mapped: Exercise[] = await Promise.all(
-          routineExs.map(async (re) => {
-            let prevSets: any[] = []
-            try {
-              prevSets = await getPreviousWorkoutSets(re.id)
-            } catch (e) {
-              console.error('Failed to get previous sets for routine exercise:', e)
-            }
+        const mapped: Exercise[] = template.routineExercises.map((re) => {
+            const prevSets = template.previousSets[re.id] ?? []
 
             const defaultSets: Set[] = []
             const setLimit = re.sets || 3
@@ -186,7 +237,6 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
               sets: defaultSets,
             }
           })
-        )
         setExercises(mapped)
         if (mapped.length > 0) {
           setCurrentExerciseId(mapped[0].id)
@@ -219,6 +269,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
   const handleResumeWorkout = async () => {
     if (!savedWorkoutData) return
+    prepareRestAudio()
     setLoading(true)
     try {
       const allExs = await getExercises()
@@ -226,10 +277,23 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
       setExercises(savedWorkoutData.exercises || [])
       setNotes(savedWorkoutData.notes || '')
-      if (savedWorkoutData.actualStartTime) {
-        setActualStartTime(new Date(savedWorkoutData.actualStartTime))
+      setActiveRoutineId(savedWorkoutData.routineId)
+      const start = savedWorkoutData.actualStartTime
+        ? new Date(savedWorkoutData.actualStartTime)
+        : new Date(Date.now() - (savedWorkoutData.elapsedSeconds || 0) * 1000)
+      setActualStartTime(start)
+      setElapsedSeconds(elapsedSecondsSince(start))
+      setDefaultRestDuration(savedWorkoutData.defaultRestDuration || 90)
+      setAutoRestEnabled(savedWorkoutData.autoRestEnabled ?? true)
+      if (savedWorkoutData.rest) {
+        const rest = savedWorkoutData.rest
+        const remaining = rest.paused ? rest.remaining : remainingRestSeconds(rest.endsAt || 0)
+        setRestTimeRemaining(remaining)
+        setRestEndsAt(rest.paused ? null : rest.endsAt)
+        setIsRestPaused(rest.paused)
+        setIsRestActive(rest.active && remaining > 0)
+        if (rest.active && !remaining) success('Istirahat selesai', 'Waktu istirahat sudah selesai saat kamu meninggalkan aplikasi.')
       }
-      setElapsedSeconds(savedWorkoutData.elapsedSeconds || 0)
       setWorkoutStarted(savedWorkoutData.workoutStarted)
       if (savedWorkoutData.exercises && savedWorkoutData.exercises.length > 0) {
         setCurrentExerciseId(savedWorkoutData.exercises[0].id)
@@ -250,20 +314,23 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
   // Autosave active workout state to localStorage
   useEffect(() => {
-    if (workoutStarted && exercises.length > 0 && !workoutCompleted) {
+    if (workoutStarted && !workoutCompleted) {
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          routineId,
+          routineId: activeRoutineId,
           exercises,
           notes,
           actualStartTime: actualStartTime ? actualStartTime.toISOString() : null,
           elapsedSeconds,
           workoutStarted,
+          defaultRestDuration,
+          autoRestEnabled,
+          rest: { endsAt: restEndsAt, remaining: restTimeRemaining, paused: isRestPaused, active: isRestActive },
         })
       )
     }
-  }, [exercises, notes, actualStartTime, elapsedSeconds, workoutStarted, routineId, workoutCompleted, storageKey])
+  }, [exercises, notes, actualStartTime, workoutStarted, activeRoutineId, workoutCompleted, storageKey, defaultRestDuration, autoRestEnabled, restEndsAt, isRestPaused, isRestActive, restTimeRemaining])
 
   const addExerciseToLog = async () => {
     if (!selectedAddExerciseId) return
@@ -364,15 +431,13 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
   const updateSet = (exerciseId: number, setIndex: number, field: keyof Set, value: any) => {
     if (field === 'completed' && value === true) {
-      if (!workoutStarted) {
+      if (!workoutStarted && !autoRestEnabled) {
         startWorkout()
       }
 
       // Trigger rest timer if enabled
       if (autoRestEnabled) {
-        setRestTimeRemaining(defaultRestDuration)
-        setIsRestActive(true)
-        setIsRestPaused(false)
+        startRest()
       }
 
       setExercises((prevExercises) =>
@@ -437,7 +502,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
       ex.sets.some((s) => s.completed && (s.reps ?? 0) > 0)
     )
     if (!hasCompletedSets) {
-      warning('Belum ada set selesai', 'Selesaikan minimal satu set (centang ✓) sebelum mengakhiri workout.')
+      warning('Belum ada set selesai', 'Tandai minimal satu set selesai sebelum mengakhiri workout.')
       return
     }
 
@@ -462,7 +527,8 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
         .filter((ex) => ex.sets.length > 0) // drop exercises with no completed sets
 
       await saveWorkout({
-        routineId,
+        routineId: activeRoutineId,
+        startedAt: start.toISOString(),
         duration,
         notes: notes || undefined,
         completedExercises,
@@ -470,6 +536,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
       // Mark as completed FIRST to prevent autosave from re-writing localStorage
       setWorkoutCompleted(true)
+      setIsRestActive(false)
       localStorage.removeItem(storageKey)
 
       router.push('/workouts')
@@ -487,7 +554,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
   const totalSets = exercises.reduce((total, ex) => total + ex.sets.length, 0)
 
   if (loading) {
-    return <div className="text-center text-slate-400 py-12">Loading workout...</div>
+    return <div role="status" className="text-center text-slate-400 py-12">Menyiapkan sesi latihanmu...</div>
   }
 
   if (resumePromptVisible) {
@@ -499,10 +566,10 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
             </span>
-            Workout Aktif Ditemukan
+            Masih ada sesi yang berjalan.
           </CardTitle>
           <CardDescription className="text-slate-400">
-            Anda memiliki sesi workout sebelumnya yang belum selesai. Apakah Anda ingin melanjutkannya?
+            Sesi terakhirmu belum selesai. Lanjut dari catatan yang sudah tersimpan?
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -559,14 +626,14 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                 ) : (
                   <span className="h-2 w-2 rounded-full bg-slate-600"></span>
                 )}
-                <p className="text-sm text-slate-400 leading-none font-medium">Workout Time</p>
+                <p className="text-sm text-slate-400 leading-none font-medium">Waktu latihan</p>
               </div>
               <p className={`text-3xl font-bold tabular-nums ${workoutStarted ? 'text-white' : 'text-slate-500'}`}>
                 {elapsedTime}
               </p>
             </div>
             <div>
-              <p className="text-sm text-slate-400">Sets Completed</p>
+              <p className="text-sm text-slate-400">Set selesai</p>
               <p className="text-3xl font-bold text-white">
                 {completedSets} / {totalSets}
               </p>
@@ -583,20 +650,16 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setRestTimeRemaining(defaultRestDuration)
-                  setIsRestActive(true)
-                  setIsRestPaused(false)
-                }}
+                onClick={() => startRest()}
                 className="gap-1.5 border-slate-700 hover:bg-slate-800 text-slate-300 h-8 text-xs"
               >
                 <Timer className="h-3.5 w-3.5 text-orange-500" />
-                Start Rest ({defaultRestDuration}s)
+                Istirahat ({defaultRestDuration}s)
               </Button>
             </div>
             
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 font-medium">Auto-Rest Timer:</span>
+              <span className="text-xs text-slate-400 font-medium">Istirahat otomatis</span>
               <button
                 type="button"
                 onClick={() => setAutoRestEnabled(!autoRestEnabled)}
@@ -617,6 +680,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
       <Card className="border-slate-800 bg-slate-900/50">
         <CardContent className="pt-6 flex flex-col sm:flex-row gap-3">
           <select
+            aria-label="Kategori gerakan"
             value={selectedCategory}
             onChange={(e) => {
               setSelectedCategory(e.target.value)
@@ -635,11 +699,12 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
           <div className="flex flex-1 gap-2">
             <select
+              aria-label="Gerakan yang akan ditambahkan"
               value={selectedAddExerciseId}
               onChange={(e) => setSelectedAddExerciseId(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize text-sm focus:outline-none focus:border-orange-500"
+            className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white capitalize text-sm focus:outline-none focus:border-orange-500"
             >
-              <option value="">Choose exercise to add...</option>
+              <option value="">Pilih gerakan...</option>
               {filteredExercises.map((ex) => (
                 <option key={ex.id} value={ex.id}>
                   {ex.name}
@@ -648,7 +713,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
             </select>
             <Button onClick={addExerciseToLog} className="gap-2 bg-orange-500 hover:bg-orange-600 shrink-0">
               <Plus className="h-4 w-4" />
-              Add
+                Tambah
             </Button>
           </div>
         </CardContent>
@@ -670,6 +735,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                     size="icon"
                     className="text-slate-400 hover:text-red-400 hover:bg-slate-800 h-9 w-9 rounded-lg"
                     title="Hapus Latihan"
+                  aria-label={`Hapus latihan ${exercise.name}`}
                   >
                     <X className="h-4 w-4" strokeWidth={2.5} />
                   </Button>
@@ -679,15 +745,15 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                     size="sm"
                     className={exercise.id === currentExerciseId ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-700'}
                   >
-                    Focus
+                    Fokus
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {exercise.sets.map((set, index) => (
-                <div key={index} className="flex items-end gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <div className="flex-1">
+                <div key={index} className="flex items-end gap-2 sm:gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:p-4">
+                  <div className="min-w-0 flex-1">
                     <p className="mb-2 text-sm text-slate-400 font-semibold">
                       Set {set.setNumber}
                       {set.previousWeight && set.previousReps && (
@@ -696,24 +762,30 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                         </span>
                       )}
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-[1fr_1fr_44px] gap-2">
                       <div>
-                        <label className="text-xs text-slate-400">Reps</label>
+                        <label htmlFor={`reps-${exercise.id}-${index}`} className="text-xs text-slate-400">Reps</label>
                         <input
+                          id={`reps-${exercise.id}-${index}`}
+                          inputMode="numeric"
+                          min={1}
+                          step={1}
                           type="number"
                           value={set.reps || ''}
                           onChange={(e) => updateSet(exercise.id, index, 'reps', e.target.value ? parseInt(e.target.value) : '')}
-                          placeholder={set.previousReps ? `${set.previousReps}` : 'Reps'}
+                          placeholder={set.previousReps ? `${set.previousReps}` : '0'}
                           className="w-full rounded border border-slate-600 bg-slate-700 px-2 py-1 text-white"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400">Weight (kg)</label>
+                        <label htmlFor={`weight-${exercise.id}-${index}`} className="text-xs text-slate-400">Weight (kg)</label>
                         <input
+                          id={`weight-${exercise.id}-${index}`}
+                          inputMode="decimal"
                           type="text"
                           value={set.weight || ''}
                           onChange={(e) => updateSet(exercise.id, index, 'weight', e.target.value)}
-                          placeholder={set.previousWeight ? `${parseFloat(set.previousWeight)}` : 'Weight'}
+                          placeholder={set.previousWeight ? `${parseFloat(set.previousWeight)}` : '0'}
                           className="w-full rounded border border-slate-600 bg-slate-700 px-2 py-1 text-white"
                         />
                       </div>
@@ -721,6 +793,8 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                         <label className="text-xs text-slate-400 block mb-1 invisible select-none">Status</label>
                         <Button
                           onClick={() => updateSet(exercise.id, index, 'completed', !set.completed)}
+                          aria-label={`${set.completed ? 'Batalkan' : 'Selesaikan'} set ${set.setNumber} ${exercise.name}`}
+                          aria-pressed={set.completed}
                           size="sm"
                           variant={set.completed ? 'default' : 'outline'}
                           className={set.completed ? 'bg-green-600 hover:bg-green-700 text-white w-full h-9' : 'border-slate-700 w-full h-9'}
@@ -732,6 +806,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                   </div>
                   <Button
                     onClick={() => removeSet(exercise.id, index)}
+                    aria-label={`Hapus set ${set.setNumber} ${exercise.name}`}
                     size="sm"
                     variant="outline"
                     className="text-red-400 hover:text-red-300 border-slate-700 h-9"
@@ -742,7 +817,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
               ))}
               <Button onClick={() => addSet(exercise.id)} variant="outline" className="w-full gap-2 border-slate-700 hover:bg-slate-800">
                 <Plus className="h-4 w-4" />
-                Add Set
+                Tambah set
               </Button>
             </CardContent>
           </Card>
@@ -753,8 +828,9 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
       {exercises.length > 0 && (
         <Card className="border-slate-800 bg-slate-900/50">
           <CardContent className="pt-6 space-y-2">
-            <label className="text-sm font-medium text-slate-300">Workout Notes (optional)</label>
+            <label htmlFor="workout-notes" className="text-sm font-medium text-slate-300">Catatan sesi (opsional)</label>
             <textarea
+              id="workout-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g., Felt great today, hit PR on bench!"
@@ -771,7 +847,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
             onClick={startWorkout}
             className="w-full bg-orange-500 hover:bg-orange-600 h-12 text-lg font-bold text-white transition-all"
           >
-            Start Workout
+            Mulai latihan
           </Button>
         ) : (
           <div className="flex gap-3">
@@ -799,7 +875,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
               disabled={saving}
               className="flex-1 bg-green-600 hover:bg-green-700 h-12 text-lg font-bold text-white transition-all"
             >
-              {saving ? 'Saving...' : 'Finish Workout'}
+              {saving ? 'Menyimpan...' : 'Selesaikan latihan'}
             </Button>
           </div>
         )
@@ -807,21 +883,19 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
       {/* Rest Timer Floating Overlay */}
       {isRestActive && restTimeRemaining > 0 && (
-        <div className="fixed bottom-6 right-6 z-50 w-full max-w-[340px] px-4 sm:px-0 transition-all duration-300 animate-in slide-in-from-bottom-5">
-          <Card className="border-orange-500/80 bg-slate-950/95 shadow-lg shadow-orange-950/40 border-2 overflow-hidden backdrop-blur-md">
-            {/* Top accent glow line */}
-            <div className="h-1 bg-gradient-to-r from-orange-600 via-orange-500 to-amber-400 w-full" />
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 sm:w-[340px] max-h-[80dvh] overflow-y-auto">
+          <Card className="border-orange-500 bg-slate-950 shadow-lg overflow-hidden">
             
             <CardContent className="p-4 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Timer className="h-5 w-5 text-orange-500 animate-pulse" />
-                  <span className="font-bold text-white tracking-wide text-sm uppercase">Rest Timer</span>
+                  <Timer className="h-5 w-5 text-orange-400" />
+                  <span className="font-semibold text-white text-sm">Waktu istirahat</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-[10px] uppercase text-slate-400 font-semibold cursor-pointer select-none" htmlFor="autoRestToggle">
-                    Auto-Rest
+            <label className="text-[10px] text-slate-400 font-semibold cursor-pointer select-none" htmlFor="autoRestToggle">
+                    Otomatis
                   </label>
                   <input
                     id="autoRestToggle"
@@ -835,15 +909,15 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
 
               {/* Digital Countdown and Progress bar */}
               <div className="relative pt-2 text-center">
-                <div className="text-4xl font-extrabold text-white font-mono tracking-widest tabular-nums drop-shadow-[0_2px_8px_rgba(249,115,22,0.3)]">
+                <div className="text-5xl font-semibold text-white tabular-nums tracking-tight" role="timer" aria-label="Sisa waktu istirahat">
                   {Math.floor(restTimeRemaining / 60)}:{(restTimeRemaining % 60).toString().padStart(2, '0')}
                 </div>
                 
                 {/* Progress Bar Container */}
                 <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mt-3.5 border border-slate-700/50">
                   <div
-                    className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${(restTimeRemaining / defaultRestDuration) * 100}%` }}
+                    className="bg-orange-500 h-full rounded-full transition-all duration-200 ease-linear"
+                    style={{ width: `${Math.min(100, (restTimeRemaining / defaultRestDuration) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -851,7 +925,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
               {/* Controls */}
               <div className="flex items-center justify-between gap-2 pt-1">
                 <Button
-                  onClick={() => setRestTimeRemaining((prev) => Math.max(0, prev - 30))}
+                  onClick={() => adjustRest(-30)}
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 font-medium hover:text-white"
@@ -860,7 +934,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                 </Button>
 
                 <Button
-                  onClick={() => setIsRestPaused(!isRestPaused)}
+                  onClick={toggleRestPause}
                   variant="default"
                   size="sm"
                   className={`h-9 px-4 font-bold text-white shrink-0 shadow-sm ${
@@ -874,11 +948,11 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                   ) : (
                     <Pause className="h-4 w-4 mr-1.5 fill-white" />
                   )}
-                  {isRestPaused ? 'Resume' : 'Pause'}
+                  {isRestPaused ? 'Lanjut' : 'Jeda'}
                 </Button>
 
                 <Button
-                  onClick={() => setRestTimeRemaining((prev) => prev + 30)}
+                  onClick={() => adjustRest(30)}
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 font-medium hover:text-white"
@@ -889,27 +963,27 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                 <Button
                   onClick={() => {
                     setIsRestActive(false)
+                    setRestEndsAt(null)
                     setRestTimeRemaining(0)
                   }}
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs text-red-400 hover:text-red-300 border-red-950/50 bg-red-950/10 hover:bg-red-950/20"
                 >
-                  Skip
+                  Lewati
                 </Button>
               </div>
 
               {/* Presets Settings */}
-              <div className="border-t border-slate-800 pt-3">
-                <p className="text-[10px] text-slate-400 font-bold uppercase mb-2 text-center tracking-wider">Default Duration</p>
+              <details className="border-t border-slate-800 pt-3">
+                <summary className="text-xs text-slate-400 font-medium mb-2 cursor-pointer">Atur durasi istirahat</summary>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[60, 90, 120, 180].map((dur) => (
                     <button
                       key={dur}
                       onClick={() => {
                         setDefaultRestDuration(dur)
-                        setRestTimeRemaining(dur)
-                        setIsRestPaused(false)
+                        startRest(dur)
                       }}
                       className={`py-1 text-[11px] font-bold rounded transition-colors ${
                         defaultRestDuration === dur
@@ -921,7 +995,7 @@ export default function WorkoutLogger({ userId }: { userId?: string }) {
                     </button>
                   ))}
                 </div>
-              </div>
+              </details>
             </CardContent>
           </Card>
         </div>

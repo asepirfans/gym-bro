@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { getUserProfile, updateUserProfile } from '@/app/actions/profile'
 import { useToast } from '@/components/toast-provider'
-import { User, Tag, Mail, Sparkles, Loader2 } from 'lucide-react'
+import { User, Tag, Mail, Info, Loader2 } from 'lucide-react'
 
 export default function ProfileClient() {
   const [name, setName] = useState('')
@@ -56,9 +56,7 @@ export default function ProfileClient() {
   }
 
   return (
-    <Card className="border-slate-800 bg-slate-900/40 backdrop-blur-md shadow-2xl relative overflow-hidden group">
-      {/* Decorative top gradient glow */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500"></div>
+    <Card className="border-slate-800 bg-slate-900 relative overflow-hidden">
       
       <CardHeader className="space-y-1 pb-6">
         <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2.5">
@@ -66,7 +64,7 @@ export default function ProfileClient() {
           Detail Profil
         </CardTitle>
         <CardDescription className="text-slate-400">
-          Kelola informasi profil Anda dan atur ID unik untuk berbagi rutinitas.
+          Nama untuk menyapa, username untuk saling berbagi rutinitas.
         </CardDescription>
       </CardHeader>
 
@@ -74,27 +72,29 @@ export default function ProfileClient() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email (Read only) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+            <label htmlFor="profile-email" className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
               <Mail className="h-3.5 w-3.5" />
               Alamat Email
             </label>
             <input
               type="email"
+              id="profile-email"
               value={email}
               disabled
               className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-sm text-slate-500 select-none cursor-not-allowed focus:outline-none"
             />
-            <p className="text-[10px] text-slate-500">Email dihubungkan ke sistem autentikasi Anda.</p>
+            <p className="text-[10px] text-slate-500">Email yang kamu pakai untuk masuk ke akun.</p>
           </div>
 
           {/* Display Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+            <label htmlFor="profile-name" className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
               <User className="h-3.5 w-3.5" />
               Nama Lengkap
             </label>
             <input
               type="text"
+              id="profile-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Masukkan nama Anda"
@@ -105,7 +105,7 @@ export default function ProfileClient() {
 
           {/* Unique Username / Share ID */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+            <label htmlFor="profile-username" className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
               <Tag className="h-3.5 w-3.5" />
               Username / ID Berbagi
             </label>
@@ -115,6 +115,7 @@ export default function ProfileClient() {
               </span>
               <input
                 type="text"
+                id="profile-username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="username"
@@ -124,9 +125,9 @@ export default function ProfileClient() {
             </div>
             <div className="rounded-lg bg-orange-500/5 border border-orange-500/10 p-3 mt-2">
               <p className="text-[11px] text-orange-400/90 leading-relaxed flex gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Mengapa Username penting?</strong> Username ini berfungsi sebagai ID unik Anda. Teman dapat mencari username Anda di menu <strong>Routines</strong> untuk melihat dan mengimpor rutinitas latihan publik yang Anda bagikan.
+                  <strong>Biar gampang saling berbagi.</strong> Berikan username ini ke teman supaya mereka bisa mengirim rutinitas langsung ke inbox-mu.
                 </span>
               </p>
             </div>
@@ -136,7 +137,7 @@ export default function ProfileClient() {
           <Button
             type="submit"
             disabled={saving}
-            className="w-full bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold h-11 shadow-lg shadow-orange-500/15 cursor-pointer mt-4"
+            className="w-full bg-orange-500 hover:bg-orange-600 font-semibold h-12 mt-4"
           >
             {saving ? (
               <span className="flex items-center justify-center gap-2">
